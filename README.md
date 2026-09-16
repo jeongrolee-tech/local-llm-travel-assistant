@@ -53,7 +53,7 @@
 | Cloud 본 실험 | 1개 모델 × 5개 질문 × 1회 = **5회** |
 | 채점 | 5항목 × 0~2점, 100점 환산 집계 |
 
-질문 세트와 채점 기준은 **첫 호출 이전에 확정·커밋**했습니다. (커밋 `{해시}`)
+질문 세트와 채점 기준은 **첫 호출 이전에 확정·커밋**했습니다. (커밋 [`7800589`](https://github.com/jeongrolee-tech/local-llm-travel-assistant/commit/7800589))
 
 - 정책 문서: [data/policy.md](data/policy.md)
 - 질문 10개: [data/questions.json](data/questions.json)
