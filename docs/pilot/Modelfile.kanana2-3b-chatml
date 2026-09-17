@@ -1,0 +1,13 @@
+FROM hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M
+
+TEMPLATE """{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+<think>
+
+</think>
+
+"""
+
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|end_of_text|>"

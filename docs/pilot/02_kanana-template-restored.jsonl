@@ -1,0 +1,10 @@
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q1", "type": "normal", "grounded": true, "elapsed_s": 0.143, "prompt_tok": 811, "out_tok": 12, "answer": "출발 25일 전에 취소하면 취소 수수료가 없습니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q2", "type": "normal", "grounded": true, "elapsed_s": 0.175, "prompt_tok": 818, "out_tok": 16, "answer": "출발 6일 전에 취소하면 총액의 10%를 내야 합니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q3", "type": "normal", "grounded": true, "elapsed_s": 0.135, "prompt_tok": 809, "out_tok": 12, "answer": "150,000원 (성인 요금의 80%)"}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q4", "type": "normal", "grounded": true, "elapsed_s": 0.234, "prompt_tok": 813, "out_tok": 25, "answer": "여권 유효기간이 6개월 미만이면 일본 입국 시 문제가 될 수 있습니다. 출발 전 반드시 여권 유효기간을 확인하세요."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q5", "type": "normal", "grounded": true, "elapsed_s": 0.23, "prompt_tok": 807, "out_tok": 25, "answer": "네, 1인 객실 사용 시 추가 요금이 발생합니다. 1인 객실 추가 요금은 220,000원입니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q6", "type": "normal", "grounded": true, "elapsed_s": 0.075, "prompt_tok": 807, "out_tok": 5, "answer": "포함되어 있습니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q7", "type": "boundary", "grounded": true, "elapsed_s": 0.447, "prompt_tok": 814, "out_tok": 52, "answer": "아니요. 천재지변으로 항공편이 결항된 경우 취소 수수료를 면제합니다. 단, 항공사 결항 확인서 또는 기상청 특보 발효 내역 등 증빙 자료를 제출해야 하며, 개인 사정으로 인한 미탑승은 본 조항의 적용 대상이 아닙니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q8", "type": "boundary", "grounded": "partial", "elapsed_s": 0.105, "prompt_tok": 815, "out_tok": 8, "answer": "1인 객실 추가 요금이 발생합니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q9", "type": "insufficient_info", "grounded": false, "elapsed_s": 0.136, "prompt_tok": 810, "out_tok": 12, "answer": "보험의 상해 보장 한도는 3천만원입니다."}
+{"model": "kanana2-3b-chatml:q4km", "qid": "Q10", "type": "out_of_scope", "grounded": false, "elapsed_s": 0.264, "prompt_tok": 808, "out_tok": 30, "answer": "베트남 다낭은 대한민국 여권 소지자에 한해 90일 이내 관광 목적 체류 시 비자 면제입니다.  \n따라서 다낭 상품도 무비자입니다."}
