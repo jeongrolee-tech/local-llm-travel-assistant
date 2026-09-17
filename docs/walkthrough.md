@@ -29,10 +29,13 @@ ollama ps
 **확인:** `ollama ps`가 비어 있어야 합니다. 앞 실험이 남아 있으면 로딩 시간이 0으로
 측정되어 워밍업 구분이 무의미해집니다.
 
+> `ollama` 파이썬 패키지는 `__version__`을 노출하지 않습니다. 버전은 아래처럼
+> `importlib.metadata.version()`으로 읽습니다.
+
 **기록할 것 (발제문 STEP 4):** Python 버전, Ollama 버전, 주요 패키지 버전, GPU/VRAM.
 
 ```bash
-uv run python -c "import sys, ollama; print(sys.version); print('ollama', ollama.__version__)"
+uv run python -c "import sys; from importlib.metadata import version; print(sys.version); print('ollama', version('ollama')); print('openai', version('openai'))"
 nvidia-smi --query-gpu=name,memory.total --format=csv
 ```
 
@@ -262,15 +265,35 @@ print("저장 완료")
 발제문 STEP 4: "**오류 증상과 확인 내용**을 기록합니다."
 
 ```python
+import httpx
+
+CASES = ["qwen3.5:999b", "존재하지-않는-모델:99b"]
+for name in CASES:
+    try:
+        client.chat(model=name,
+                    messages=[{"role": "user", "content": "안녕"}], stream=False)
+    except Exception as e:
+        print("%-24s -> %s: %s" % (name, type(e).__name__, e))
+
+# 타임아웃도 확인합니다 (본 실험에서 실제로 날 수 있는 실패입니다)
+slow = Client(host="http://127.0.0.1:11434", timeout=0.001)
 try:
-    client.chat(model="존재하지-않는-모델:99b",
-                messages=[{"role": "user", "content": "안녕"}], stream=False)
+    slow.chat(model=MODEL, messages=[{"role": "user", "content": "안녕"}], stream=False)
 except Exception as e:
-    print("오류 유형:", type(e).__name__)
-    print("오류 내용:", e)
+    print("%-24s -> %s: %s" % ("timeout", type(e).__name__, e))
 ```
 
-**확인:** 어떤 예외가 나는지. 본 실험 스크립트는 이 예외를 잡아
+**실제 출력 (검증 완료)**
+
+```
+qwen3.5:999b             -> ResponseError: model 'qwen3.5:999b' not found (status code: 404)
+존재하지-않는-모델:99b     -> ResponseError: invalid model name (status code: 400)
+timeout                  -> ReadTimeout: timed out
+```
+
+**확인:** 오류 종류가 셋으로 갈립니다. 존재하지 않는 태그(404), 형식이 잘못된
+이름(400), 타임아웃(`ReadTimeout`). 본 실험 스크립트는 `ollama.ResponseError`와
+`httpx.ReadTimeout`을 모두 잡아야 40회가 중간에 멈추지 않습니다. 본 실험 스크립트는 이 예외를 잡아
 **품질 점수와 분리해** `errors.jsonl`에 남겨야 합니다.
 
 > 발제문 Quality 원칙: "호출 실패는 품질 점수와 별도로 기록하고
