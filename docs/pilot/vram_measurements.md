@@ -53,11 +53,11 @@
 
 두 모델을 연달아 적재하고 `ollama ps`로 잔류 여부를 확인했습니다 (각 `num_ctx=4096`, `keep_alive=5m`).
 
-| 조합 | 합계 VRAM | 여유 (8,151 MiB 기준) | 결과 |
-|---|---|---|---|
-| `qwen3.5:9b` + `gemma4:e4b` | 8,313 MiB | 초과 | 두 번째 적재 시 첫 번째 evict |
-| `qwen3.5:9b` + `gemma4:e2b` | 6,865 MiB | 1,286 MiB 여유 | 동일하게 evict |
-| `qwen3.5:4b` + `gemma4:e2b` | 4,612 MiB | 3,539 MiB 여유 | 동일하게 evict |
+| 조합 | 실제 적재 합계 | 여유 (8,151 MiB 기준) | 기본 설정 | `MAX_LOADED_MODELS=2` |
+|---|---|---|---|---|
+| `qwen3.5:9b` + `gemma4:e4b` | 8,313 MiB | 초과 | evict | **evict** |
+| `qwen3.5:9b` + `gemma4:e2b` | 6,865 MiB | 1,286 MiB 여유 | evict | **evict** |
+| `qwen3.5:4b` + `gemma4:e2b` | 4,612 MiB | 3,539 MiB 여유 | evict | **evict** |
 
 **VRAM이 남아도 evict됩니다.** 절반 조금 넘게 쓰는 조합에서도 같은 결과이므로, 원인은 VRAM 용량이 아니라 Ollama의 적재 정책입니다.
 
@@ -67,7 +67,25 @@ OLLAMA_NUM_PARALLEL      = (미설정)
 OLLAMA_GPU_OVERHEAD      = (미설정)
 ```
 
-이 값들을 변경하려면 Ollama 서버 재시작이 필요하며, **본 실험에서는 변경해 검증하지 않았습니다.**
+`OLLAMA_MAX_LOADED_MODELS=2`로 임시 서버를 띄워 다시 측정했으나 **결과가 같았습니다.** 서버 로그에 사유가 남습니다.
+
+```
+msg="llama-server model predicted to exceed available memory, evicting"
+    predicted="9.4 GiB" predicted_num_ctx=4096 num_batch=512 available="1.8 GiB"   # gemma4:e4b
+    predicted="6.8 GiB" predicted_num_ctx=4096 num_batch=512 available="1.8 GiB"   # gemma4:e2b
+    predicted="6.8 GiB" predicted_num_ctx=4096 num_batch=512 available="4.0 GiB"   # gemma4:e2b
+```
+
+**스케줄러의 사전 예측치가 실제 적재량보다 훨씬 큽니다.** `gemma4:e2b`의 적재 후 `size_vram`은 1,629 MiB인데 적재 전 예측은 6.8 GiB로 약 4배입니다. 예측에 멀티모달 projector의 worst-case가 포함되기 때문입니다.
+
+```
+srv load_model: [mtmd] estimated worst-case memory usage of mmproj is 1152.07 MiB   # gemma4
+srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 MiB   # qwen3.5
+```
+
+따라서 `ollama ps`의 `size_vram`으로 "두 모델이 함께 올라가겠다"를 판단할 수 없습니다. 적재 가능 여부는 **스케줄러 예측치** 기준입니다.
+
+> 이 측정은 임시 서버로 수행한 뒤 원래 구성(Ollama 데스크톱 앱)으로 복구했습니다. `OLLAMA_MAX_LOADED_MODELS`를 사용자 환경에 영구 등록하지 않았습니다.
 
 ### 모델 전환 비용
 
