@@ -12,6 +12,8 @@ r = client.chat(
     # temperature 를 0 으로 두지 않는 이유는 01_ollama_chat.py 주석과
     # README 4절 참조. 요약: rubric.md 의 P4 판정이 "4회 중 3회 이상" 이라
     # 회차마다 답이 달라져야 성립하는데, temperature=0 이면 반복이 전부 같습니다.
+    # num_ctx 를 8192 로 바꾸면 qwen3.5:9b 가 CPU 로 분할됩니다.
+    # 100% GPU -> 88% GPU, 생성 속도 59.8 -> 53.0 tok/s (docs/walkthrough_log.md STEP 5)
     options={"temperature": 0.2, "num_ctx": 4096},   # 본 실험 고정값
 )
 elapsed = perf_counter() - start
@@ -25,3 +27,14 @@ if r.eval_duration and r.eval_duration > 0:
 else:
     print("생성 속도      : 계산 불가 (eval_duration <= 0)")
 print("종료 사유      :", r.done_reason)
+
+for m in client.ps().models:
+    if m.model == MODEL:
+        vram, total = m.size_vram, m.size
+        print("VRAM (GPU 적재):", round(vram / 1048576), "MiB")
+        print("전체 적재      :", round(total / 1048576), "MiB")
+        print("적재 상태      :", "100% GPU" if vram == total
+              else "%.0f%% GPU / CPU 분할" % (vram / total * 100))
+        print("digest         :", m.digest[:12])
+        print("quantization   :", m.details.quantization_level)
+        print("실제 context   :", m.context_length)
