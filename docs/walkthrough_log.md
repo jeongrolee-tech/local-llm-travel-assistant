@@ -32,14 +32,28 @@ NVIDIA GeForce RTX 5060 Laptop GPU, 8151 MiB
 
 ```
 $ ollama --version
-(붙여넣기)
+ollama version is 0.34.0
 
 $ ollama list
-(붙여넣기)
+NAME                                                   ID              SIZE      MODIFIED
+kanana2-3b-chatml:q4km                                 ab937df3c73d    2.2 GB    15 hours ago
+hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M    d5a16a4a92bc    2.2 GB    16 hours ago
+exaone3.5:7.8b                                         c7c4e3d1ca22    4.8 GB    16 hours ago
+gemma4:e2b                                             7fbdbf8f5e45    7.2 GB    18 hours ago
+qwen3.5:4b                                             2a654d98e6fb    3.4 GB    18 hours ago
+gemma4:e4b                                             c6eb396dbd59    9.6 GB    18 hours ago
+qwen3.5:9b                                             6488c96fa5fa    6.6 GB    19 hours ago
+gemma3:4b                                              a2af6cc3eb7f    3.3 GB    8 days ago
+qwen3:4b-instruct-2507-q4_K_M                          0edcdef34593    2.5 GB    8 days ago
 
 $ ollama ps
-(붙여넣기 — 비어 있어야 정상)
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL
+(비어 있음)
 ```
+
+> `gemma3:4b`, `qwen3:4b-instruct-2507-q4_K_M` 은 선행 가이드 연습용이고
+> `kanana2-3b-chatml:q4km` 은 오판으로 재빌드한 것입니다. 셋 다 본 실험 후보가 아닙니다.
+> 본 실험 대상은 `qwen3.5:9b`(로컬 A)와 `gemma4:e4b`(로컬 B)입니다.
 
 ### 정리
 
@@ -50,12 +64,12 @@ $ ollama ps
 | 패키지 관리 | uv |
 | `ollama` (Python 패키지) | 0.6.2 |
 | `openai` (Python 패키지) | 3.8.0 |
-| Ollama (서버) | `{붙여넣기}` |
+| Ollama (서버) | 0.34.0 |
 | GPU | NVIDIA GeForce RTX 5060 Laptop GPU |
 | VRAM | 8,151 MiB |
 | 시스템 RAM | 31.4 GB |
 
-**확인 결과:** `{ollama ps 가 비어 있었는가}`
+**확인 결과:** `ollama ps` 가 비어 있어 적재된 모델이 없는 상태에서 시작했습니다. `results/practice/` 디렉터리를 생성했습니다.
 
 ---
 
