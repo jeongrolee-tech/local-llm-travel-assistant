@@ -76,20 +76,47 @@ NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL
 ## STEP 1. CLI 대화
 
 ```
-$ ollama run qwen3.5:9b --think=false "출발 25일 전에 취소하면 수수료가 얼마인가요?"
-(붙여넣기)
-
 $ ollama ps
-(붙여넣기)
+NAME          ID              SIZE      PROCESSOR    CONTEXT    UNTIL
+qwen3.5:9b    6488c96fa5fa    5.5 GB    100% GPU     4096       4 minutes from now
 ```
+
+### thinking 켬/끔 비교 (`--verbose`)
+
+같은 질문을 `--think=false` 유무만 바꿔 실행했습니다. 각 실행 전 `ollama stop`으로 내렸습니다.
+
+| 항목 | `--think=false` | thinking 켬 (기본값) | 차이 |
+|---|---|---|---|
+| total duration | **14.80s** | **45.78s** | **3.1배** |
+| load duration | 3.89s | 4.60s | — |
+| prompt eval count | 25 tok | 23 tok | — |
+| eval count (출력) | 489 tok | **2,170 tok** | **4.4배** |
+| eval duration | 10.79s | 41.04s | 3.8배 |
+| eval rate | 45.32 tok/s | 52.87 tok/s | 생성 속도 자체는 비슷 |
 
 **확인 결과**
 
 | 항목 | 값 |
 |---|---|
-| PROCESSOR | `{}` |
-| CONTEXT | `{}` |
-| `--think=false` 없이 실행했을 때 체감 차이 | `{}` |
+| PROCESSOR | `100% GPU` |
+| CONTEXT | `4096` |
+| SIZE | 5.5 GB |
+| thinking 켰을 때 | 전체 시간 3.1배, 출력 토큰 4.4배 |
+
+**관찰 3가지**
+
+1. **생성 속도(tok/s)는 오히려 thinking 쪽이 약간 빠릅니다.** 느려진 이유는 속도가 아니라
+   **토큰을 4.4배 더 뽑기 때문**입니다. 발제문 주의사항 *"tokens/s만으로 품질이나 체감
+   속도를 판단하지 않습니다"* 가 그대로 확인됩니다.
+
+2. **thinking 내용이 영어로 생성됩니다.** 한국어 질문인데 사고 과정은 전부 영어였습니다
+   (`Okay, the user is asking about cancellation fees...`). 본 실험은 `think=False`로
+   고정하므로 영향은 없지만, thinking을 켜는 구성을 검토한다면 고려할 점입니다.
+
+3. **답변이 규정을 지어내지 않고 되물었습니다.** 정책 문서를 주지 않았으므로 항공사·예약
+   경로를 확인해 달라고 답했습니다. 정상이며, 이 시점의 답변 품질은 평가 대상이 아닙니다.
+   다만 **고정 지시문이 없어 "3문장 이내" 제약이 적용되지 않아** 489토큰이 나왔습니다.
+   지시문과 정책 문서를 넣는 것은 STEP 6입니다.
 
 ---
 

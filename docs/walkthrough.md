@@ -44,14 +44,24 @@ nvidia-smi --query-gpu=name,memory.total --format=csv
 ## STEP 1. CLI 대화 (발제문: "CLI 대화 성공과 Python 호출 성공을 각각 확인")
 
 ```bash
-ollama run qwen3.5:9b --think=false "출발 25일 전에 취소하면 수수료가 얼마인가요?"
+ollama run qwen3.5:9b --think=false --verbose "출발 25일 전에 취소하면 수수료가 얼마인가요?"
 ollama ps
 ```
 
+`--verbose`를 붙이면 CLI에서도 `total duration` / `load duration` / `eval count` /
+`eval rate`를 볼 수 있습니다. 숫자를 기록에 남기려면 필요합니다.
+
 **확인:** `PROCESSOR`가 `100% GPU`인지, `CONTEXT`가 얼마인지.
 
-`--think=false`를 뺀 채로 한 번 더 돌려보십시오. 훨씬 오래 걸립니다.
-이것이 README 4절에서 thinking을 끈 이유입니다.
+`--think=false`를 뺀 채로 한 번 더 돌려 비교하십시오.
+
+```bash
+ollama stop qwen3.5:9b
+ollama run qwen3.5:9b --verbose "출발 25일 전에 취소하면 수수료가 얼마인가요?"
+```
+
+이것이 README 4절에서 thinking을 끈 이유입니다. 실측 차이는
+[walkthrough_log.md](walkthrough_log.md) STEP 1에 있습니다.
 
 ```bash
 ollama stop qwen3.5:9b
