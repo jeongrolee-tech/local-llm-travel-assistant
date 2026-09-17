@@ -335,9 +335,11 @@ qwen3.5 계열은 **thinking이 기본 활성**입니다. 기본값으로 `num_c
 | 항목 | 값 |
 |---|---|
 | OS | Windows 11 Pro 10.0.26200 |
-| Python | 3.12 |
-| 패키지 관리 | uv |
-| Ollama | 0.34.0 |
+| Python | 3.12.13 |
+| 패키지 관리 | uv (`uv.lock` 고정) |
+| `ollama` (Python 패키지) | 0.6.2 |
+| `openai` (Python 패키지) | 3.8.0 |
+| Ollama (서버) | 0.34.0 |
 | GPU / VRAM | NVIDIA GeForce RTX 5060 Laptop GPU / 8,151 MiB |
 | 시스템 RAM | 31.4 GB |
 
@@ -516,6 +518,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | [docs/02_model_comparison.md](docs/02_model_comparison.md) | **Model Comparison Table (산출물 2번)** |
 | [docs/cli/cli_session.txt](docs/cli/cli_session.txt) | CLI(`ollama run`) 실행 기록 |
 | [docs/walkthrough.md](docs/walkthrough.md) | 수동 실행 워크스루 (발제문 STEP 4) |
+| [docs/walkthrough_log.md](docs/walkthrough_log.md) | 수동 실행 기록 (환경·측정값·오류 증빙) |
 | [docs/pilot/](docs/pilot/) | 후보 선별 예비 실행 원본 기록 (본 실험 아님) |
 | [docs/03_benchmark.md](docs/03_benchmark.md) | 실험 결과와 품질 평가 |
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
