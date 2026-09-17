@@ -36,7 +36,7 @@
 | `qwen3.5:4b` | 로컬 A와 같은 계열의 소형 | 제외. 예비 실행 Q1 응답에 **중국어 토큰 혼입**(`出发`) — 루브릭 항목 4 "외국어 혼입" 0점 기준. 중요 가치 1순위(한국어 표현)와 직접 충돌. |
 | `gemma4:e2b` | 후보 중 VRAM 최소(1,629 MiB), 응답 최속(평균 0.55초) | 예비. 정답 후 "확인이 어렵습니다"를 덧붙이는 자기모순 패턴. 로컬 B가 같은 계열에서 더 안정적이라 후순위. |
 | `exaone3.5:7.8b` | 한국어·영어 2개국어 특화, KoMT-Bench 7.96 | **탈락 — P2 실패.** License 1.1-NC가 상업적 사용을 금지. 품질 측정을 수행하지 않았다. |
-| Kanana 2 3B | 한국어 특화, 한국어 토크나이저 효율 최고, 응답 최속(0.19초) | **탈락 — P4 미달.** 예비 실행 Q9·Q10에서 문서에 없는 내용을 생성("3천만원", "90일 비자 면제"). 채팅 템플릿 복원 후에도 남음. |
+| Kanana 2 3B | 한국어 특화, 한국어 토크나이저 효율 최고, 응답 최속(0.19초) | **탈락 — P4 미달.** 예비 실행 Q9·Q10에서 문서에 없는 내용을 생성("3천만원", "90일 비자 면제"). `temperature=0` 재검증에서도 동일하게 재현되어 모델 원인으로 확정. |
 
 ---
 
@@ -50,7 +50,7 @@
 | `gemma4:e2b` | `7fbdbf8f5e45` | [google/gemma-4-E2B-it](https://huggingface.co/google/gemma-4-E2B-it) | Ollama 공식 라이브러리 배포본 (instruct 튜닝본) |
 | `exaone3.5:7.8b` | `c7c4e3d1ca22` | [LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct](https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct) | Ollama 공식 라이브러리 배포본 |
 | `hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M` | `d5a16a4a92bc` | [kakaocorp/kanana-2-3b-instruct](https://huggingface.co/kakaocorp/kanana-2-3b-instruct) | **커뮤니티 GGUF 변환본.** 카카오가 공식 GGUF를 배포하지 않음 |
-| `kanana2-3b-chatml:q4km` | `ab937df3c73d` | 위 변환본 | 위 변환본에 ChatML 템플릿을 복원해 로컬에서 재빌드 ([Modelfile](pilot/Modelfile.kanana2-3b-chatml)) |
+| `kanana2-3b-chatml:q4km` | `ab937df3c73d` | 위 변환본 | 템플릿 누락으로 오판해 재빌드한 것. **재검증 결과 무효과**로 확인되어 사용하지 않음 ([Modelfile](pilot/Modelfile.kanana2-3b-chatml), [README 2-8](../README.md)) |
 
 **다운로드 파일 크기 / 시스템 RAM / VRAM은 서로 다른 값입니다.** 특히 `gemma4:e2b`는 디스크 7.2 GB인데 VRAM은 1,629 MiB입니다. Per-Layer Embeddings 테이블이 GPU에 상주하지 않기 때문입니다. 자세한 측정은 [pilot/vram_measurements.md](pilot/vram_measurements.md)에 있습니다.
 
@@ -73,19 +73,18 @@
 
 ## 4. Chat Template
 
-Ollama 0.34는 모델에 따라 두 가지 방식으로 대화 형식을 적용합니다.
+Ollama 0.34는 모델에 따라 세 가지 방식으로 대화 형식을 적용합니다 — 내장 렌더러, Modelfile의 Go 템플릿, GGUF에 내장된 Jinja 템플릿입니다.
 
 | 모델 | 적용 방식 | `ollama show --modelfile` 출력 |
 |---|---|---|
 | `qwen3.5:9b` / `qwen3.5:4b` | **내장 렌더러** | `TEMPLATE {{ .Prompt }}` + `RENDERER qwen3.5` + `PARSER qwen3.5` |
 | `gemma4:e4b` / `gemma4:e2b` | **내장 렌더러** | `TEMPLATE {{ .Prompt }}` + `RENDERER gemma4` + `PARSER gemma4` |
 | `exaone3.5:7.8b` | Go 템플릿 | `TEMPLATE {{- range $i, $_ := .Messages }}...` + `PARAMETER stop [\|endofturn\|]` + `SYSTEM` |
-| `hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M` | **없음** | `TEMPLATE {{ .Prompt }}` — 렌더러도 Go 템플릿도 없음 |
-| `kanana2-3b-chatml:q4km` | Go 템플릿 (직접 복원) | ChatML `<\|im_start\|>` / `<\|im_end\|>` + stop 토큰 2개 |
+| `hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M` | **GGUF 내장 Jinja** | `TEMPLATE {{ .Prompt }}` — 그러나 `--template`은 공식 Jinja **10,725 bytes** 출력 |
 
-**`TEMPLATE {{ .Prompt }}` 한 줄만으로는 결함을 판단할 수 없습니다.** 공식 배포본인 Qwen3.5와 Gemma 4도 같은 줄을 출력하며, 대화 형식은 `RENDERER`/`PARSER`가 처리합니다. Kanana 커뮤니티 변환본은 **렌더러도 Go 템플릿도 없어** 역할 마커 없이 프롬프트가 그대로 모델에 전달되었습니다.
+**`ollama show --modelfile`의 `TEMPLATE` 줄로는 템플릿 유무를 판단할 수 없습니다.** 위 네 모델이 모두 `TEMPLATE {{ .Prompt }}`를 출력하지만, 실제 대화 형식은 Qwen3.5·Gemma 4의 경우 `RENDERER`/`PARSER`가, Kanana 변환본의 경우 **GGUF에 내장된 공식 Jinja 템플릿**이 처리합니다. 확인하려면 `ollama show --template`을 사용해야 합니다.
 
-원본 저장소의 [`chat_template.jinja`](https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/chat_template.jinja)를 확인해 ChatML 구조와 기본 `no_think` 모드를 파악하고 Go 템플릿으로 복원했습니다. 복원 전후 비교는 [README 2-8](../README.md)에 있습니다.
+Kanana 변환본의 템플릿이 누락되었다고 오판해 ChatML로 재빌드한 적이 있으나, 재검증 결과 **프롬프트 토큰 수와 출력이 모두 동일해 무효과**임을 확인했습니다. 오판과 정정 과정은 [README 2-8](../README.md)에 기록했습니다.
 
 ---
 

@@ -83,10 +83,9 @@ Context Length는 모델 카드 최대값입니다. **실험에서 실제 사용
 | `qwen3.5:9b` / `qwen3.5:4b` | 내장 렌더러 | `TEMPLATE {{ .Prompt }}` + `RENDERER qwen3.5` + `PARSER qwen3.5` |
 | `gemma4:e4b` / `gemma4:e2b` | 내장 렌더러 | `TEMPLATE {{ .Prompt }}` + `RENDERER gemma4` + `PARSER gemma4` |
 | `exaone3.5:7.8b` | Go 템플릿 | `.Messages` 순회 + `PARAMETER stop [\|endofturn\|]` + `SYSTEM` |
-| Kanana 2 3B (변환본 원본) | **없음** | `TEMPLATE {{ .Prompt }}` — 렌더러도 Go 템플릿도 없음 |
-| `kanana2-3b-chatml:q4km` | Go 템플릿 (직접 복원) | ChatML + stop 토큰 2개 |
+| Kanana 2 3B (커뮤니티 변환본) | **GGUF 내장 Jinja 템플릿** | `TEMPLATE {{ .Prompt }}` — 그러나 `--template`은 공식 Jinja 10,725 bytes를 출력 |
 
-**`TEMPLATE {{ .Prompt }}` 한 줄만으로는 결함을 판단할 수 없습니다.** 공식 배포본인 Qwen3.5·Gemma 4도 같은 줄을 출력하며, 대화 형식은 `RENDERER`/`PARSER`가 처리합니다. Kanana 변환본은 **렌더러도 Go 템플릿도 없어서** 역할 마커 없이 프롬프트가 그대로 전달되었습니다(2-8).
+**`ollama show --modelfile`의 `TEMPLATE` 줄로는 템플릿 유무를 판단할 수 없습니다.** 네 모델 모두 `TEMPLATE {{ .Prompt }}`를 출력하지만, 실제 대화 형식은 Qwen3.5·Gemma 4의 경우 `RENDERER`/`PARSER`가, Kanana 변환본의 경우 **GGUF에 내장된 공식 Jinja 템플릿**이 처리합니다. 확인하려면 `ollama show --template`을 써야 합니다. 이 점을 처음에 잘못 판단했고 재검증으로 바로잡은 과정은 2-8에 기록했습니다.
 
 #### 공개 Benchmark
 
@@ -136,7 +135,7 @@ digest·quantization·context·capabilities는 모두 로컬 `ollama list` / `ol
 
 ### 2-4. Kanana 2 3B 사용 시 주의
 
-**공식 GGUF가 없습니다.** 카카오는 Kanana 2 3B의 GGUF 배포본을 제공하지 않아, 커뮤니티 변환본 [`mradermacher/kanana-2-3b-instruct-GGUF`](https://huggingface.co/mradermacher/kanana-2-3b-instruct-GGUF)를 사용했습니다. 공식 배포본과 양자화·템플릿 구성이 다를 수 있으므로, **본 실험 결과는 해당 변환본 기준이며 원본 모델의 성능과 동일하다고 단정하지 않습니다.** 실제로 `ollama show --license` 출력이 비어 있어(변환본에 LICENSE 미포함) 라이선스는 원본 저장소 기준으로 확인했습니다. **또한 이 변환본에는 대화 형식을 적용할 렌더러도 Go 템플릿도 없어** 첫 실행이 비정상 동작했습니다. 템플릿 복원 과정과 복원 전후 비교는 2-8을 참조하십시오.
+**공식 GGUF가 없습니다.** 카카오는 Kanana 2 3B의 GGUF 배포본을 제공하지 않아, 커뮤니티 변환본 [`mradermacher/kanana-2-3b-instruct-GGUF`](https://huggingface.co/mradermacher/kanana-2-3b-instruct-GGUF)를 사용했습니다. 공식 배포본과 양자화·템플릿 구성이 다를 수 있으므로, **본 실험 결과는 해당 변환본 기준이며 원본 모델의 성능과 동일하다고 단정하지 않습니다.** 실제로 `ollama show --license` 출력이 비어 있어(변환본에 LICENSE 미포함) 라이선스는 원본 저장소 기준으로 확인했습니다. 반면 **채팅 템플릿은 정상적으로 포함되어 있습니다** — `ollama show --template`이 원본 저장소와 같은 공식 Jinja 템플릿(10,725 bytes)을 출력합니다. 이를 누락으로 오판했다가 재검증한 과정은 2-8에 있습니다.
 
 **베이스 모델 확인 결과 — Qwen3에서 이어서 학습한 모델이 아닙니다.** `config.json`의 `model_type`은 `"qwen3"`, `architectures`는 `["Qwen3ForCausalLM"]`로 **Qwen3 아키텍처 클래스를 그대로 사용**합니다. 그러나 모델 카드는 *"Kanana-2-3B was pretrained from scratch on TPU clusters"* 라고 명시하고, `vocab_size`도 128,256으로 Qwen3와 다른 자체 토크나이저를 씁니다. 즉 **가중치를 물려받은 파생 모델이 아니라, 같은 아키텍처 정의로 처음부터 사전학습한 모델**입니다.
 
@@ -236,29 +235,39 @@ digest·quantization·context·capabilities는 모두 로컬 `ollama list` / `ol
 
 P4 정식 판정은 본 실험 Q9·Q10 **4회** 기준입니다. 위는 1회 실행 결과이므로 정식 판정이 아니라 **후보 선별 근거**입니다.
 
-#### 대표 실패 사례 — 실패 원인이 모델이 아니라 환경이었던 경우
+#### 대표 실패 사례 — 원인을 환경으로 오판했다가 재검증으로 바로잡은 경우
 
-Kanana 2 3B 커뮤니티 변환본의 첫 실행 결과가 비정상적으로 짧았습니다(평균 19토큰). 원인을 추적한 결과 **이 변환본에는 대화 형식을 적용할 수단이 전혀 없었습니다.**
+Kanana 2 3B 커뮤니티 변환본의 첫 실행 결과가 비정상적으로 짧았습니다(평균 19토큰, 대부분 오답).
 
-```
-$ ollama show hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M --modelfile
-TEMPLATE {{ .Prompt }}
-```
+**1차 가설 — 채팅 템플릿 누락 (틀렸습니다).** `ollama show --modelfile` 출력이 `TEMPLATE {{ .Prompt }}` 한 줄뿐이라 대화 형식이 적용되지 않는다고 판단했습니다. 원본 저장소의 `chat_template.jinja`를 참고해 ChatML Go 템플릿을 만들고 `kanana2-3b-chatml:q4km`으로 재빌드해 재측정했더니 Q5·Q7이 개선된 것처럼 보였고, 이를 **환경 원인**으로 기록했습니다.
 
-`TEMPLATE {{ .Prompt }}` 자체는 결함이 아닙니다. 공식 배포본인 `qwen3.5`·`gemma4`도 같은 줄을 출력하되 `RENDERER`/`PARSER`가 대화 형식을 처리합니다(2-1 Chat Template 표). 이 변환본은 **렌더러도 Go 템플릿도 없어서** 역할 마커(`<|im_start|>` / `<|im_end|>`) 없이 원문이 그대로 입력되고 있었습니다.
+**재검증 — 가설이 기각되었습니다.** 세 가지가 어긋났습니다.
 
-원본 저장소의 `chat_template.jinja`에서 ChatML 구조와 기본 `no_think` 모드를 확인해 템플릿을 복원하고 `kanana2-3b-chatml:q4km`으로 재빌드한 뒤 재측정했습니다.
-
-| 문항 | 템플릿 누락 상태 | 템플릿 복구 후 |
+| 검증 | 결과 | 의미 |
 |---|---|---|
-| Q5 (1인 객실 추가 요금) | ❌ "추가 요금이 붙습니다" (금액 없음) | ✅ "220,000원" |
-| Q7 (천재지변 면제) | ❌ "확인이 어렵습니다" | ✅ 면제 + 증빙 + 예외까지 |
-| **Q9 (보험 한도)** | ❌ "보험 약관에 따라 다릅니다" | ❌ **"3천만원입니다"** |
-| **Q10 (베트남 다낭)** | ❌ "90일 이내 비자 면제" | ❌ **"90일 이내 비자 면제"** |
+| 재빌드 전후 프롬프트 토큰 비교 | 10문항 **전부 diff = 0** (811, 818, 809, …) | 모델에 들어간 입력이 바뀌지 않았다 |
+| `temperature=0`, `seed=42`로 `"안녕"` 1개 메시지 | 양쪽 모두 `prompt_eval_count=14`, 답변 문자열 동일 | 재빌드가 아무것도 바꾸지 않았다 |
+| `ollama show --template` | **공식 Jinja 템플릿 10,725 bytes 출력** (원본 저장소 파일과 동일 크기) | 템플릿은 처음부터 GGUF에 내장되어 정상 적용되고 있었다 |
 
-**실패 원인 구분:** Q5·Q7은 **환경(변환본 템플릿 누락)** 원인이었고 복구 후 해소되었습니다. Q9·Q10은 템플릿 복구 후에도 남았으므로 **모델** 원인입니다. 따라서 이 변환본의 P4 미달은 변환 결함으로 설명되지 않습니다.
+`--modelfile`의 `TEMPLATE {{ .Prompt }}`는 Go 템플릿 필드 표시일 뿐이고, 실제 형식은 GGUF 내장 Jinja가 처리하고 있었습니다. **재빌드는 무효과였고, Q5·Q7의 차이는 `temperature=0.2` 단일 실행의 샘플링 변동이었습니다.**
 
-이 결과는 **해당 커뮤니티 변환본 기준**이며 원본 `kakaocorp/kanana-2-3b-instruct`의 성능과 동일하다고 단정하지 않습니다 (2-4 참조).
+`temperature=0`, `seed=42`로 고정해 원본 변환본을 다시 돌려 확인했습니다.
+
+| 문항 | 1차 실행 (temp 0.2) | 2차 실행 (temp 0.2) | 재검증 (temp 0) | 판정 |
+|---|---|---|---|---|
+| Q5 (1인 객실 추가 요금) | "추가 요금이 붙습니다" | "220,000원입니다" | **"추가 요금이 붙습니다"** | 샘플링 변동 |
+| Q7 (천재지변 면제) | "확인이 어렵습니다" | 면제 + 증빙 + 예외 | **면제 + 증빙 + 예외** | 샘플링 변동 |
+| **Q9 (보험 한도)** | 문서 밖 생성 | "3천만원입니다" | **문서 밖 생성** | **모델 원인 — 일관됨** |
+| **Q10 (베트남 다낭)** | "90일 비자 면제" | "90일 비자 면제" | **"90일 비자 면제"** | **모델 원인 — 일관됨** |
+
+**실패 원인 구분 — 정정된 결론.** Q5·Q7은 환경이 아니라 **측정**의 문제였습니다(1회 실행의 샘플링 변동을 설정 변경 효과로 오독). Q9·Q10은 `temperature=0`에서도 동일하게 재현되므로 **모델** 원인입니다. **Kanana 2 3B의 P4 미달은 변환본 결함이 아니라 모델 자체의 결과이며, 탈락 판정은 유지됩니다.**
+
+**여기서 얻은 교훈 두 가지를 실험 규칙으로 반영합니다.**
+
+1. `ollama show --modelfile`의 `TEMPLATE` 줄로 템플릿 유무를 판단하지 않습니다. `--template`으로 확인합니다.
+2. `temperature > 0`인 **1회 실행의 응답 차이를 설정 변경의 효과로 해석하지 않습니다.** 본 실험이 질문당 2회를 요구하는 이유가 여기에 있습니다.
+
+재검증 원본은 [docs/pilot/04_kanana-recheck-temp0.txt](docs/pilot/04_kanana-recheck-temp0.txt)에 있습니다. 이 결과는 **해당 커뮤니티 변환본 기준**이며 원본 `kakaocorp/kanana-2-3b-instruct`의 성능과 동일하다고 단정하지 않습니다 (2-4 참조).
 
 #### 모델 크기와 품질의 관계
 
@@ -496,6 +505,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 - 공개 Benchmark는 모델 카드 게시값을 옮긴 것이며 직접 재현하지 않았습니다. 평가 프로토콜이 모델마다 달라 순위 근거로 사용하지 않았습니다.
 - 라우팅의 품질 이득은 예비 실행 데이터로 계산한 상한이며, 라우팅을 실제로 실행해 측정하지 않았습니다(8-1).
 - CLI 실행 기록은 실행 가능 여부 확인용입니다. `ollama run` 기본 설정을 사용해 Python 경로와 생성 설정이 다르므로 측정값을 비교하지 않았습니다.
+- 예비 실행은 질문당 1회이고 `temperature=0.2`이므로 응답 차이에 샘플링 변동이 섞여 있습니다. 실제로 이를 설정 변경 효과로 오독한 사례가 있었고 재검증으로 바로잡았습니다(2-8). 본 실험은 질문당 2회로 이 위험을 줄입니다.
 
 ---
 

@@ -25,7 +25,8 @@
 | 파일 | 내용 |
 |---|---|
 | `01_qwen3.5-9b_kanana-raw-gguf.txt` / `.jsonl` | `qwen3.5:9b`, Kanana 2 3B **변환본 원본 상태**(채팅 템플릿 누락) |
-| `02_kanana-template-restored.txt` / `.jsonl` | Kanana 2 3B **템플릿 복구 후** 재측정 |
+| `02_kanana-template-restored.txt` / `.jsonl` | Kanana 2 3B ChatML 재빌드본 측정 — **재검증 결과 원본과 무효과 차이 없음** |
+| `04_kanana-recheck-temp0.txt` | Kanana 2 3B 원본 변환본 `temperature=0`, `seed=42` 재검증 |
 | `03_gemma4-e2b-e4b_qwen3.5-4b.txt` / `.jsonl` | `gemma4:e2b`, `gemma4:e4b`, `qwen3.5:4b` |
 | `run_pilot.py` | 예비 실행 스크립트 (재현용) |
 | `Modelfile.kanana2-3b-chatml` | Kanana 변환본 채팅 템플릿 복구용 Modelfile |
@@ -53,4 +54,6 @@ bash docs/pilot/measure_vram.sh
 - ✅/◐/❌ 간이 판정은 후보 선별용이며 [data/rubric.md](../../data/rubric.md)의 5항목 × 0~2점 정식 채점이 **아닙니다.**
 - P4 정식 판정은 Q9·Q10 **4회** 기준입니다. 이 기록은 1회이므로 정식 판정이 아니라 선별 근거입니다.
 - Kanana 2 3B 결과는 **커뮤니티 GGUF 변환본 기준**이며, 원본 `kakaocorp/kanana-2-3b-instruct`의 성능과 동일하다고 단정하지 않습니다.
+- `02_`의 ChatML 재빌드는 채팅 템플릿이 누락되었다는 **오판**에서 나온 것입니다. 재검증 결과 프롬프트 토큰 수와 출력이 원본과 같아 무효과였습니다. 경위는 [README 2-8](../../README.md)에 있습니다.
+- 예비 실행은 `temperature=0.2`, 질문당 1회이므로 응답 차이에 샘플링 변동이 섞여 있습니다. 설정 변경의 효과로 해석하지 마십시오.
 - `exaone3.5:7.8b`는 License(EXAONE 1.1 - NC)가 P2를 충족하지 못해 **품질 측정을 수행하지 않았습니다.** VRAM만 기록했습니다.
