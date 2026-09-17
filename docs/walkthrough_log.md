@@ -481,34 +481,91 @@ $ uv run python examples/05_record.py
 
 ## STEP 8. 오류 확인
 
-```
-(붙여넣기)
-```
+실행 스크립트: [`examples/06_errors.py`](../examples/06_errors.py)
 
 | 오류 상황 | 예외 유형 | 메시지 |
 |---|---|---|
-| 존재하지 않는 태그 | `{}` | `{}` |
-| 형식이 잘못된 이름 | `{}` | `{}` |
-| 타임아웃 | `{}` | `{}` |
+| 존재하지 않는 태그 | `ollama.ResponseError` | `model 'qwen3.5:999b' not found (status code: 404)` |
+| 형식이 잘못된 이름 | `ollama.ResponseError` | `invalid model name (status code: 400)` |
+| 타임아웃 | `httpx.ReadTimeout` | `timed out` |
+| 서버 연결 불가 | `ConnectionError` (내장) | `Failed to connect to Ollama. ...` |
 
-**본 실험 반영:** `{run_local.py 가 어떤 예외를 잡아야 하는가}`
+### 세 부류가 서로 다른 계통입니다
+
+```
+ollama.ResponseError  <- Exception <- BaseException
+httpx.ReadTimeout     <- TimeoutException <- TransportError <- RequestError
+ConnectionError       <- OSError <- Exception <- BaseException
+```
+
+```
+httpx.HTTPError 로 ollama.ResponseError 가 잡히는가: False
+httpx.HTTPError 로 ConnectionError 가 잡히는가    : False
+```
+
+**하나의 상위 클래스로 묶이지 않습니다.** 처음에는 `except (ResponseError, httpx.HTTPError)`
+로 잡으면 된다고 적었는데, 확인해 보니 서버 연결 불가는 파이썬 **내장 `ConnectionError`**
+(ollama 패키지가 httpx 예외를 감싸 다시 던짐)라 그 절에 걸리지 않습니다.
+
+**본 실험 반영 — 호출 단위로 넓게 잡고 예외 유형을 기록합니다.**
+
+```python
+try:
+    r = client.chat(...)
+except Exception as e:                       # 40회가 중간에 멈추면 안 된다
+    rec = {"status": "error",
+           "error_type": type(e).__name__,   # ResponseError / ReadTimeout / ConnectionError
+           "error_msg": str(e)}
+    errors.write(json.dumps(rec, ensure_ascii=False) + "\n")   # results/errors.jsonl
+```
+
+예외 종류를 좁게 나열하면 예상 못 한 하나에 40회가 통째로 멈춥니다. 넓게 잡되
+`type(e).__name__` 을 남겨 나중에 분류할 수 있게 합니다.
+
+호출 실패는 **품질 점수와 분리해 기록하고 성공 응답으로 대체하지 않습니다.**
+모델별로 **성공 수 / 전체 시도 수**를 따로 표시합니다. (발제문 Quality 원칙)
 
 ---
 
 ## STEP 9. 모델 교체
 
+`05_record.py` 가 모델을 인자로 받도록 고쳐 같은 입력을 두 모델에 적용했습니다.
+모델 교체 전 `ollama stop` 으로 내렸습니다.
+
 ```
-(붙여넣기 — gemma4:e4b 로 STEP 6~7 재실행)
+$ uv run python examples/05_record.py gemma4:e4b
 ```
 
-| 항목 | `qwen3.5:9b` | `gemma4:e4b` |
-|---|---|---|
-| 입력 토큰 (동일 입력) | `{}` | `{}` |
-| 출력 토큰 | `{}` | `{}` |
-| 전체 응답 시간 | `{}` | `{}` |
-| VRAM | `{}` | `{}` |
+| 항목 | `qwen3.5:9b` (로컬 A) | `gemma4:e4b` (로컬 B) | 차이 |
+|---|---|---|---|
+| digest | `6488c96fa5fa` | `c6eb396dbd59` | |
+| **입력 토큰** (동일 입력) | **979** | **1,074** | **+9.7%** |
+| 출력 토큰 | 60 | 73 | |
+| 전체 응답 시간 | 5.42초 | 6.47초 | |
+| └ 모델 로딩 | 3.87초 | 5.14초 | |
+| └ **나머지** | **1.55초** | **1.33초** | **B가 빠름** |
+| 생성 속도 | 58.8 tok/s | **84.2 tok/s** | **+43%** |
+| VRAM | 5,236 MiB | **3,077 MiB** | **-41%** |
+| 적재 상태 | 100% GPU | 100% GPU | |
 
-**확인 결과:** `{입력 토큰이 왜 달랐는가}`
+**확인 결과 ① — 입력 토큰이 다른 이유는 토크나이저입니다.**
+
+똑같은 지시문·정책 문서·질문인데 979 대 1,074 토큰입니다. Qwen3.5 의 vocab 은
+248,320, Gemma 4 는 262,144 로 서로 다른 토크나이저를 씁니다. 예비 실행 10문항 평균
+(979.6 대 1,071.6)과 같은 경향이 1회 실행에서도 확인됩니다.
+
+**확인 결과 ② — 전체 응답 시간만 보면 로컬 B가 느려 보이지만 반대입니다.**
+
+6.47초 대 5.42초로 B가 1.05초 느립니다. 그런데 **차이는 전부 모델 로딩에서 왔습니다**
+(5.14초 대 3.87초). 로딩을 빼면 1.33초 대 1.55초로 **B가 빠릅니다.** 생성 속도로 보면
+84.2 대 58.8 tok/s 로 43% 차이입니다.
+
+STEP 3에서 배운 것이 그대로 적용됩니다 — **전체 응답 시간만으로 모델을 비교할 수 없고,
+`load_duration` 을 분리해야 합니다.** 본 실험에서 워밍업을 집계에서 빼는 이유이기도
+합니다.
+
+**확인 결과 ③ — 로컬 B가 VRAM을 41% 적게 씁니다.** 3,077 대 5,236 MiB 입니다.
+선호 우선순위 4순위(VRAM 사용량)에서 B가 유리합니다.
 
 ---
 
@@ -518,6 +575,7 @@ $ uv run python examples/05_record.py
 |---|---|---|---|
 | STEP 0 | `ollama.__version__` AttributeError | `ollama` 파이썬 패키지가 `__version__`을 노출하지 않음 | `importlib.metadata.version("ollama")`로 변경 |
 | STEP 3 | 1·2회차 차이가 0.86초로 워밍업 효과가 안 보임 | 직전 스크립트 실행으로 모델이 이미 적재된 상태였음 | `ollama stop` 후 재측정. `03_measure_time.py`에 `load_duration` 출력과 적재 상태 경고 추가 |
+| STEP 8 | `except (ResponseError, httpx.HTTPError)` 로는 서버 연결 불가가 안 잡힘 | 연결 실패는 httpx 예외가 아니라 파이썬 내장 `ConnectionError` 로 던져짐 | 호출 단위로 `except Exception` 으로 넓게 잡고 `type(e).__name__` 을 기록하도록 변경 |
 | | | | |
 
 ---
@@ -526,7 +584,7 @@ $ uv run python examples/05_record.py
 
 - [ ] 워밍업 1회를 `results/local_warmup.jsonl`로 분리
 - [ ] 질문당 2회를 각각 저장 (좋은 쪽만 고르지 않음)
-- [ ] `ResponseError`·`ReadTimeout`을 잡아 `results/errors.jsonl`로 분리
+- [ ] 호출 단위로 `except Exception` 으로 잡고 `type(e).__name__` 과 함께 `results/errors.jsonl`로 분리 (좁게 나열하면 `ConnectionError` 를 놓침)
 - [ ] `eval_duration <= 0`이면 생성 속도를 `None` + 사유로 기록
 - [ ] 모델 교체 전 `keep_alive=0`으로 내리기
 - [ ] 레코드에 digest·quantization·context_length·생성 설정·적재 상태 포함

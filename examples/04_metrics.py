@@ -1,3 +1,11 @@
+import io, json
+
+policy = io.open("data/policy.md", encoding="utf-8").read()
+sysp = io.open("data/system_prompt.txt", encoding="utf-8").read().replace("{policy}", policy)
+qs = json.load(io.open("data/questions.json", encoding="utf-8"))["questions"]
+q = qs[0]
+
+
 from time import perf_counter
 from ollama import Client
 
@@ -7,14 +15,16 @@ client = Client(host="http://127.0.0.1:11434", timeout=180)
 start = perf_counter()
 r = client.chat(
     model=MODEL,
-    messages=[{"role": "user", "content": "안녕하세요"}],
+    # messages=[{"role": "user", "content": "안녕하세요"}],
+    messages=[{"role": "system", "content": sysp},
+            {"role": "user", "content": q["question"]}],
     stream=False, think=False,
     # temperature 를 0 으로 두지 않는 이유는 01_ollama_chat.py 주석과
     # README 4절 참조. 요약: rubric.md 의 P4 판정이 "4회 중 3회 이상" 이라
     # 회차마다 답이 달라져야 성립하는데, temperature=0 이면 반복이 전부 같습니다.
     # num_ctx 를 8192 로 바꾸면 qwen3.5:9b 가 CPU 로 분할됩니다.
     # 100% GPU -> 88% GPU, 생성 속도 59.8 -> 53.0 tok/s (docs/walkthrough_log.md STEP 5)
-    options={"temperature": 0.2, "num_ctx": 4096},   # 본 실험 고정값
+    options={"temperature": 0.2, "num_ctx": 4096},   # 본 실험 고정값. 8192 로 바꾸면 CPU 분할됨. 100% GPU -> 88% GPU, 생성 속도 59.8 -> 53.0 tok/s (docs/walkthrough_log.md STEP 5)    
 )
 elapsed = perf_counter() - start
 

@@ -10,12 +10,14 @@
 import io
 import json
 import os
+import sys
 from time import perf_counter
 
 from ollama import Client
 
 # ── 본 실험 고정 설정 (README 4절) ────────────────────────────────
-MODEL = "qwen3.5:9b"
+# 모델은 인자로 바꿀 수 있다:  uv run python examples/05_record.py gemma4:e4b
+MODEL = sys.argv[1] if len(sys.argv) > 1 else "qwen3.5:9b"
 OPTIONS = {"temperature": 0.2, "num_ctx": 4096}   # num_predict 미설정 = 모델 기본값
 THINK = False
 OUT = os.path.join("results", "practice", "sample.jsonl")
