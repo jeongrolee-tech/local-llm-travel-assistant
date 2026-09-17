@@ -6,7 +6,12 @@
     uv run python src/run_cloud.py
 
 API 키는 실행할 때 터미널에 입력한다. 화면에 표시되지 않고 파일에도 저장되지
-않는다. 코드·저장소·로그·결과 파일 어디에도 키가 들어가지 않는다.
+않는다.
+
+주의: OpenAI 의 401 응답은 키를 부분 마스킹한 형태로 되돌려주며 **마지막 4자가
+그대로 남는다**. 오류를 그대로 기록하면 저장소에 키 조각이 들어가므로
+redact() 로 한 번 더 지운 뒤 저장한다. 실제로 이 실험에서 인증 실패 15건이
+발생해 키 조각이 기록된 사례가 있었고, 사후에 마스킹했다 (README 9절 #15).
 
 출력
     results/cloud_raw.jsonl   응답, 성공·오류 상태, 토큰, 응답 시간, 추정 비용
@@ -17,6 +22,7 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from getpass import getpass
@@ -41,6 +47,16 @@ MAX_TOKENS = 1024
 # 실제 사용 내역은 https://platform.openai.com/usage 에서 확인한다.
 PRICE_IN_PER_1M = 0.15
 PRICE_OUT_PER_1M = 0.60
+
+
+# OpenAI 의 401 응답은 키를 부분 마스킹해 되돌려준다 (마지막 4자가 남음).
+# 그대로 기록하면 저장소에 키 조각이 들어가므로 한 번 더 지운다.
+KEYLIKE = re.compile(r"sk-[A-Za-z0-9\-_*]{8,}")
+
+
+def redact(text):
+    """오류 메시지에서 키처럼 보이는 문자열을 제거한다."""
+    return KEYLIKE.sub("sk-***REDACTED***", str(text))
 
 
 def now():
@@ -115,14 +131,14 @@ def main():
             append(ERRORS, {
                 "ts": now(), "model": MODEL, "qid": q["id"], "run": 1, "warmup": False,
                 "status": "error", "error_type": type(e).__name__,
-                "error_msg": str(e)[:500],   # 키는 메시지에 포함되지 않는다
+                "error_msg": redact(e)[:500],   # 401 응답에 섞여 오는 키 조각을 제거
             })
             print("  [%s] 실패 %s" % (q["id"], type(e).__name__))
             continue
         except Exception as e:
             append(ERRORS, {
                 "ts": now(), "model": MODEL, "qid": q["id"], "run": 1, "warmup": False,
-                "status": "error", "error_type": type(e).__name__, "error_msg": str(e)[:500],
+                "status": "error", "error_type": type(e).__name__, "error_msg": redact(e)[:500],
             })
             print("  [%s] 실패 %s" % (q["id"], type(e).__name__))
             continue

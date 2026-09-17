@@ -82,9 +82,31 @@ S = {
  (G,"Q10",2):(2,2,2,2,2,"동일"),
 }
 
+C = "gpt-4o-mini"
+
+# Cloud 비교 실험 (STEP 7). 공통 질문 5개 × 1회. 로컬과 같은 루브릭을 적용한다.
+# 로컬은 질문당 2회이므로 반복 수가 다르다. 집계할 때 이 차이를 명시한다.
+SC = {
+ (C,"Q1",1): (1,1,2,2,None,"'출발 25일 전까지' 라는 표현이 30일 전 이전도 10%라는 오독을 유발(인접 구간 혼동, 항목1). 89,000원 미제시(항목2). '제5항 취소 수수료 규정' 항목명 명시"),
+ (C,"Q2",1): (2,2,2,2,None,"30% 구간·890,000원·2인 총액 1,780,000원·534,000원까지 완결. 항목명 명시"),
+ (C,"Q3",1): (2,2,2,2,None,"성인 요금 80%·712,000원 정확. '2항목 요금 기준' 근거 명시"),
+ (C,"Q7",1): (2,2,1,2,None,"면제·증빙·개인사정 구분 모두 정확. 근거 항목명 미제시(항목3)"),
+ (C,"Q9",1): (2,2,2,2,2,"확인 불가 명시 + 담당자 안내, 지어내지 않음"),
+}
+
 rows = [json.loads(l) for l in io.open("results/local_raw.jsonl", encoding="utf-8")]
+cloud = []
+if os.path.exists("results/cloud_raw.jsonl"):
+    cloud = [json.loads(l) for l in io.open("results/cloud_raw.jsonl", encoding="utf-8")]
+
 idx = {(r["model"], r["qid"], r["run"]): r for r in rows}
-assert len(idx) == 40 and set(idx) == set(S), "레코드와 채점표가 맞지 않음"
+assert len(idx) == 40 and set(idx) == set(S), "로컬 레코드와 채점표가 맞지 않음"
+
+ALL = dict(S)
+if cloud:
+    idx.update({(r["model"], r["qid"], r["run"]): r for r in cloud})
+    assert set(SC) <= set(idx), "Cloud 레코드와 채점표가 맞지 않음"
+    ALL.update(SC)
 
 os.makedirs("results", exist_ok=True)
 with io.open("results/scores.csv", "w", encoding="utf-8-sig", newline="") as f:
@@ -93,7 +115,7 @@ with io.open("results/scores.csv", "w", encoding="utf-8-sig", newline="") as f:
                 "item1_정확성", "item2_핵심정보누락", "item3_지시형식준수",
                 "item4_한국어표현", "item5_정보부족대응",
                 "획득점", "만점", "환산100", "score_evidence", "answer"])
-    for (m, q, run), v in sorted(S.items(), key=lambda kv: (kv[0][0], int(kv[0][1][1:]), kv[0][2])):
+    for (m, q, run), v in sorted(ALL.items(), key=lambda kv: (kv[0][0], int(kv[0][1][1:]), kv[0][2])):
         i1, i2, i3, i4, i5, ev = v
         got = i1 + i2 + i3 + i4 + (i5 or 0)
         full = 10 if i5 is not None else 8
@@ -106,7 +128,7 @@ with io.open("results/scores.csv", "w", encoding="utf-8-sig", newline="") as f:
 # ── 집계 ──────────────────────────────────────────────────────────
 import collections
 agg = collections.defaultdict(list)
-for (m, q, run), v in S.items():
+for (m, q, run), v in ALL.items():
     i1, i2, i3, i4, i5, _ = v
     got = i1 + i2 + i3 + i4 + (i5 or 0)
     full = 10 if i5 is not None else 8
@@ -114,11 +136,13 @@ for (m, q, run), v in S.items():
 
 with io.open("results/summary.csv", "w", encoding="utf-8-sig", newline="") as f:
     w = csv.writer(f)
+    # P4 는 로컬 필수 통과 조건이다 (Q9·Q10 4회 중 1점 이상 3회 이상).
+    # Cloud 는 공통 질문 5개 × 1회라 Q9 만 1회 수행했으므로 P4 판정 대상이 아니다.
     w.writerow(["model", "n", "성공수", "전체시도수", "종합점수_100환산",
                 "항목1_정확성", "항목2_핵심정보", "항목3_지시형식", "항목4_한국어",
-                "항목5_정보부족(n=4)", "P4_Q9Q10_1점이상_횟수",
+                "항목5_정보부족", "항목5_평가회차수", "P4판정",
                 "평균응답시간_s", "생성속도_tok_s", "VRAM_MiB"])
-    for m in (Q, G):
+    for m in [x for x in (Q, G, C) if x in agg]:
         rs = agg[m]
         n = len(rs)
         pct = sum(g for _, g, _, _ in rs) / sum(fu for _, _, fu, _ in rs) * 100
@@ -128,19 +152,24 @@ with io.open("results/summary.csv", "w", encoding="utf-8-sig", newline="") as f:
                 if items[k] is not None:
                     it[k].append(items[k])
         p4 = sum(1 for _, _, _, items in rs if items[4] is not None and items[4] >= 1)
-        mr = [x for x in rows if x["model"] == m]
+        n5 = len(it[4])
+        verdict = ("통과 (%d/4)" % p4 if p4 >= 3 else "실패 (%d/4)" % p4) if n5 == 4             else "해당 없음 (Cloud, 항목5 %d회)" % n5
+        mr = [x for x in (rows + cloud) if x["model"] == m]
         w.writerow([m, n, n, n, round(pct, 1)]
                    + [round(sum(c) / len(c), 2) for c in it]
-                   + [p4,
+                   + [n5, verdict,
                       round(sum(x["elapsed_s"] for x in mr) / len(mr), 2),
-                      round(sum(x["gen_tok_per_s"] for x in mr) / len(mr), 1),
-                      mr[0]["vram_mib"]])
+                      round(sum(x["gen_tok_per_s"] for x in mr) / len(mr), 1)
+                      if all("gen_tok_per_s" in x for x in mr) else "",
+                      mr[0].get("vram_mib", "")])
 
 print("results/scores.csv, results/summary.csv 생성")
 print()
-for m in (Q, G):
+for m in [x for x in (Q, G, C) if x in agg]:
     rs = agg[m]
     pct = sum(g for _, g, _, _ in rs) / sum(fu for _, _, fu, _ in rs) * 100
     kor = [items[3] for _, _, _, items in rs]
+    n5 = sum(1 for _, _, _, items in rs if items[4] is not None)
     p4 = sum(1 for _, _, _, items in rs if items[4] is not None and items[4] >= 1)
-    print("%-14s 종합 %.1f점  한국어표현 %.2f/2  P4 %d/4" % (m, pct, sum(kor) / len(kor), p4))
+    tag = ("P4 %d/4" % p4) if n5 == 4 else ("항목5 %d/%d — P4 판정 대상 아님" % (p4, n5))
+    print("%-14s 종합 %.1f점  한국어표현 %.2f/2  %s" % (m, pct, sum(kor) / len(kor), tag))
