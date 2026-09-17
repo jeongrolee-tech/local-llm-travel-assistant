@@ -1,3 +1,10 @@
+import io, json
+
+policy = io.open("data/policy.md", encoding="utf-8").read()
+sysp = io.open("data/system_prompt.txt", encoding="utf-8").read().replace("{policy}", policy)
+qs = json.load(io.open("data/questions.json", encoding="utf-8"))["questions"]
+q = qs[0]
+
 from ollama import Client
 
 MODEL = "qwen3.5:9b"
@@ -7,7 +14,9 @@ client = Client(host="http://127.0.0.1:11434", timeout=180)
 print("Ollama에 질문을 보냈습니다. 답변을 기다려 주세요.")
 response = client.chat(
     model=MODEL,
-    messages=[{"role": "user", "content": QUESTION}],
+    # messages=[{"role": "user", "content": QUESTION}],
+    messages=[{"role": "system", "content": sysp},
+                {"role": "user", "content": q["question"]}],
     stream=False,
     # thinking 모드 스위치입니다. "3문장 이내" 제약은 여기가 아니라
     # data/system_prompt.txt 규칙 2에서 옵니다.
