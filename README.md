@@ -63,6 +63,51 @@
 
 Context Length는 모델 카드 최대값입니다. **실험에서 실제 사용한 `context_length`는 4절에 따로 기록합니다.**
 
+#### Tokenizer — 한국어 입력 토큰 수 실측
+
+| 모델 | Vocab Size | 동일 입력 프롬프트 토큰 | Kanana 대비 |
+|---|---|---|---|
+| Kanana 2 3B | 128,256 | **811.2** | 기준 |
+| `qwen3.5:9b` / `qwen3.5:4b` | 248,320 | 979.6 | **+20.8%** |
+| `gemma4:e4b` / `gemma4:e2b` | 262,144 | 1,071.6 | **+32.1%** |
+| `exaone3.5:7.8b` | 102,400 | 미측정 (P2 실패로 미실행) | — |
+
+입력은 전 모델 동일합니다 — `data/system_prompt.txt` + `data/policy.md` + 질문 10개. 예비 실행 10회 평균이며 회차별 원본은 [docs/pilot/](docs/pilot/)의 `.jsonl`에 있습니다.
+
+같은 한국어 문서를 Kanana는 811 토큰, Gemma 4는 1,072 토큰으로 표현합니다. **한국어 특화 토크나이저의 효율은 실측으로 확인되지만, 본 실험에서 그 이점이 품질로 이어지지는 않았습니다** — Kanana는 P4에서 탈락했습니다(2-8).
+
+#### Chat Template
+
+| 모델 | 적용 방식 | `ollama show --modelfile` |
+|---|---|---|
+| `qwen3.5:9b` / `qwen3.5:4b` | 내장 렌더러 | `TEMPLATE {{ .Prompt }}` + `RENDERER qwen3.5` + `PARSER qwen3.5` |
+| `gemma4:e4b` / `gemma4:e2b` | 내장 렌더러 | `TEMPLATE {{ .Prompt }}` + `RENDERER gemma4` + `PARSER gemma4` |
+| `exaone3.5:7.8b` | Go 템플릿 | `.Messages` 순회 + `PARAMETER stop [\|endofturn\|]` + `SYSTEM` |
+| Kanana 2 3B (변환본 원본) | **없음** | `TEMPLATE {{ .Prompt }}` — 렌더러도 Go 템플릿도 없음 |
+| `kanana2-3b-chatml:q4km` | Go 템플릿 (직접 복원) | ChatML + stop 토큰 2개 |
+
+**`TEMPLATE {{ .Prompt }}` 한 줄만으로는 결함을 판단할 수 없습니다.** 공식 배포본인 Qwen3.5·Gemma 4도 같은 줄을 출력하며, 대화 형식은 `RENDERER`/`PARSER`가 처리합니다. Kanana 변환본은 **렌더러도 Go 템플릿도 없어서** 역할 마커 없이 프롬프트가 그대로 전달되었습니다(2-8).
+
+#### 공개 Benchmark
+
+모델 카드에 게시된 점수이며 **직접 측정한 값이 아닙니다.**
+
+| 벤치마크 | `qwen3.5:9b` | `gemma4:e4b` | `qwen3.5:4b` | `gemma4:e2b` | `exaone3.5:7.8b` | Kanana 2 3B |
+|---|---|---|---|---|---|---|
+| MMLU-Pro | **82.5** | 69.4 | 79.1 | 60.0 | 46.24 | — (MMLU-CoT 61.09) |
+| GPQA Diamond | 81.7 | 58.6 | 76.2 | 43.4 | — | — |
+| MMMLU (다국어) | 81.2 | 76.6 | 76.1 | 67.4 | — | — |
+| IFEval | 91.5 | — | 89.8 | — | 78.9 | 80.96 |
+| **KMMLU (CoT)** | 미공개 | 미공개 | 미공개 | 미공개 | 미공개 | **43.32** |
+| **KoMT-Bench** | 미공개 | 미공개 | 미공개 | 미공개 | **7.96** | 6.92 |
+| **HAE-RAE Bench** | 미공개 | 미공개 | 미공개 | 미공개 | 미공개 | 43.75 |
+
+**이 표로 순위를 매기지 않습니다.** 모델마다 공개 항목과 평가 프로토콜이 다르고, Qwen3.5 점수는 thinking 모드 기준일 가능성이 높은데 본 실험은 `think=False`입니다(4절).
+
+**결정적으로, 로컬 A·B로 선정한 Qwen3.5와 Gemma 4는 한국어 단독 벤치마크를 공개하지 않았습니다.** 한국어 지표를 공개한 것은 EXAONE 3.5(P2 실패)와 Kanana 2(P4 실패)뿐입니다. 공개 벤치마크만으로는 이 Use Case의 적합성을 판단할 수 없으며, 고정 질문 10개로 자체 측정하는 근거가 여기에 있습니다.
+
+전체 비교표는 [docs/02_model_comparison.md](docs/02_model_comparison.md)에 있습니다.
+
 ### 2-2. 실행 식별값 (Ollama)
 
 | 실행 태그 | digest | Quantization | 디스크 크기 | 모달리티 | Capabilities |
@@ -91,7 +136,7 @@ digest·quantization·context·capabilities는 모두 로컬 `ollama list` / `ol
 
 ### 2-4. Kanana 2 3B 사용 시 주의
 
-**공식 GGUF가 없습니다.** 카카오는 Kanana 2 3B의 GGUF 배포본을 제공하지 않아, 커뮤니티 변환본 [`mradermacher/kanana-2-3b-instruct-GGUF`](https://huggingface.co/mradermacher/kanana-2-3b-instruct-GGUF)를 사용했습니다. 공식 배포본과 양자화·템플릿 구성이 다를 수 있으므로, **본 실험 결과는 해당 변환본 기준이며 원본 모델의 성능과 동일하다고 단정하지 않습니다.** 실제로 `ollama show --license` 출력이 비어 있어(변환본에 LICENSE 미포함) 라이선스는 원본 저장소 기준으로 확인했습니다. **또한 이 변환본에는 채팅 템플릿도 포함되어 있지 않아**(`TEMPLATE {{ .Prompt }}`) 첫 실행이 비정상 동작했습니다. 템플릿 복원 과정과 복원 전후 비교는 2-8을 참조하십시오.
+**공식 GGUF가 없습니다.** 카카오는 Kanana 2 3B의 GGUF 배포본을 제공하지 않아, 커뮤니티 변환본 [`mradermacher/kanana-2-3b-instruct-GGUF`](https://huggingface.co/mradermacher/kanana-2-3b-instruct-GGUF)를 사용했습니다. 공식 배포본과 양자화·템플릿 구성이 다를 수 있으므로, **본 실험 결과는 해당 변환본 기준이며 원본 모델의 성능과 동일하다고 단정하지 않습니다.** 실제로 `ollama show --license` 출력이 비어 있어(변환본에 LICENSE 미포함) 라이선스는 원본 저장소 기준으로 확인했습니다. **또한 이 변환본에는 대화 형식을 적용할 렌더러도 Go 템플릿도 없어** 첫 실행이 비정상 동작했습니다. 템플릿 복원 과정과 복원 전후 비교는 2-8을 참조하십시오.
 
 **베이스 모델 확인 결과 — Qwen3에서 이어서 학습한 모델이 아닙니다.** `config.json`의 `model_type`은 `"qwen3"`, `architectures`는 `["Qwen3ForCausalLM"]`로 **Qwen3 아키텍처 클래스를 그대로 사용**합니다. 그러나 모델 카드는 *"Kanana-2-3B was pretrained from scratch on TPU clusters"* 라고 명시하고, `vocab_size`도 128,256으로 Qwen3와 다른 자체 토크나이저를 씁니다. 즉 **가중치를 물려받은 파생 모델이 아니라, 같은 아키텍처 정의로 처음부터 사전학습한 모델**입니다.
 
@@ -193,14 +238,16 @@ P4 정식 판정은 본 실험 Q9·Q10 **4회** 기준입니다. 위는 1회 실
 
 #### 대표 실패 사례 — 실패 원인이 모델이 아니라 환경이었던 경우
 
-Kanana 2 3B 커뮤니티 변환본의 첫 실행 결과가 비정상적으로 짧았습니다(평균 19토큰). 원인을 추적한 결과 **GGUF에 채팅 템플릿이 포함되어 있지 않았습니다.**
+Kanana 2 3B 커뮤니티 변환본의 첫 실행 결과가 비정상적으로 짧았습니다(평균 19토큰). 원인을 추적한 결과 **이 변환본에는 대화 형식을 적용할 수단이 전혀 없었습니다.**
 
 ```
 $ ollama show hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M --modelfile
 TEMPLATE {{ .Prompt }}
 ```
 
-역할 마커(`<|im_start|>` / `<|im_end|>`) 없이 원문이 그대로 입력되고 있었습니다. 원본 저장소의 `chat_template.jinja`에서 ChatML 구조와 기본 `no_think` 모드를 확인해 템플릿을 복원하고 `kanana2-3b-chatml:q4km`으로 재빌드한 뒤 재측정했습니다.
+`TEMPLATE {{ .Prompt }}` 자체는 결함이 아닙니다. 공식 배포본인 `qwen3.5`·`gemma4`도 같은 줄을 출력하되 `RENDERER`/`PARSER`가 대화 형식을 처리합니다(2-1 Chat Template 표). 이 변환본은 **렌더러도 Go 템플릿도 없어서** 역할 마커(`<|im_start|>` / `<|im_end|>`) 없이 원문이 그대로 입력되고 있었습니다.
+
+원본 저장소의 `chat_template.jinja`에서 ChatML 구조와 기본 `no_think` 모드를 확인해 템플릿을 복원하고 `kanana2-3b-chatml:q4km`으로 재빌드한 뒤 재측정했습니다.
 
 | 문항 | 템플릿 누락 상태 | 템플릿 복구 후 |
 |---|---|---|
@@ -388,6 +435,21 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 
 > 검증은 임시 서버(`OLLAMA_MAX_LOADED_MODELS=2`)로 수행한 뒤 원래 구성으로 복구했습니다. 사용자 환경에 이 변수를 영구 등록하지 않았습니다.
 
+**품질 이득의 상한 — 예비 실행 데이터로 계산.**
+
+라우팅이 완벽하다고 가정하고(오라클 라우팅) 문항별로 두 모델 중 좋은 쪽을 취하면 상한이 나옵니다.
+
+| | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 | ✅ |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `qwen3.5:4b` | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ◐ | ✅ | 6 |
+| `gemma4:e2b` | ◐ | ◐ | ❌ | ◐ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | 5 |
+| **오라클 합집합** | ◐ | ◐ | ✅ | ✅ | ✅ | ✅ | ✅ | **❌** | ✅ | ✅ | **7** |
+| **`gemma4:e4b` 단독** | ◐ | ❌ | ◐ | ✅ | ✅ | ✅ | ✅ | **✅** | ✅ | ✅ | **7** |
+
+**완벽하게 라우팅해도 단일 모델 `gemma4:e4b`와 같은 ✅7에 그칩니다.** Q8(경계 사례)은 4B 두 모델이 모두 실패해 라우팅으로 구제되지 않지만 `gemma4:e4b`는 단독으로 맞혔습니다. 실제 라우터는 오라클보다 나쁘므로 상한에도 못 미칩니다.
+
+이는 **기존 예비 실행 데이터로 계산한 상한이며 라우팅을 실제로 실행해 측정한 값이 아닙니다.** 1회 실행 기준의 간이 판정이라는 한계도 그대로 적용됩니다.
+
 **모델 전환 비용.**
 
 | 모델 | 로딩 시간 (`load_duration`) | 생성 시간 (10문제 평균) |
@@ -431,6 +493,9 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 - 로컬 B(`gemma4:e4b`)는 thinking을 비활성화한 상태로만 측정했습니다. thinking 활성 시의 품질은 본 실험 범위 밖입니다.
 - 다중 모델 동시 적재는 기본 설정과 `OLLAMA_MAX_LOADED_MODELS=2` 양쪽에서 확인했습니다. 그 외 설정(`OLLAMA_GPU_OVERHEAD`, `num_batch` 축소, 더 작은 `num_ctx`)으로 스케줄러 예측치를 낮출 수 있는지는 검증하지 않았습니다(8-1).
 - 모델 크기와 품질의 관계는 후보 5개, 질문 10개, 1회 실행에서 관찰한 것입니다. 일반적인 결론으로 확장하지 않았습니다.
+- 공개 Benchmark는 모델 카드 게시값을 옮긴 것이며 직접 재현하지 않았습니다. 평가 프로토콜이 모델마다 달라 순위 근거로 사용하지 않았습니다.
+- 라우팅의 품질 이득은 예비 실행 데이터로 계산한 상한이며, 라우팅을 실제로 실행해 측정하지 않았습니다(8-1).
+- CLI 실행 기록은 실행 가능 여부 확인용입니다. `ollama run` 기본 설정을 사용해 Python 경로와 생성 설정이 다르므로 측정값을 비교하지 않았습니다.
 
 ---
 
@@ -438,8 +503,9 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 
 | 문서 | 내용 |
 |---|---|
+| [docs/02_model_comparison.md](docs/02_model_comparison.md) | **Model Comparison Table (산출물 2번)** |
+| [docs/cli/cli_session.txt](docs/cli/cli_session.txt) | CLI(`ollama run`) 실행 기록 |
 | [docs/pilot/](docs/pilot/) | 후보 선별 예비 실행 원본 기록 (본 실험 아님) |
-| [docs/02_model_comparison.md](docs/02_model_comparison.md) | Model Comparison Table |
 | [docs/03_benchmark.md](docs/03_benchmark.md) | 실험 결과와 품질 평가 |
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
 | [docs/05_selection_report.md](docs/05_selection_report.md) | 최종 선정 보고서 |

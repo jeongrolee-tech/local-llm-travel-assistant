@@ -1,0 +1,84 @@
+# CLI 실행 기록 (`ollama run`)
+
+발제문 역할별 수행 체크리스트 7번 — "후보 모델 2개를 **CLI와 Python에서 모두 실행**하고,
+재현에 필요한 환경 정보를 기록했는가?" 에 대한 CLI 측 기록입니다.
+Python 호출 기록은 [../pilot/](../pilot/)에 있습니다.
+
+측정 일자: 2026-09-17 10:22:58
+
+## 환경
+
+```
+$ ollama --version
+ollama version is 0.34.0
+
+$ ollama list
+NAME                                                   ID              SIZE      MODIFIED     
+kanana2-3b-chatml:q4km                                 ab937df3c73d    2.2 GB    14 hours ago    
+hf.co/mradermacher/kanana-2-3b-instruct-GGUF:Q4_K_M    d5a16a4a92bc    2.2 GB    15 hours ago    
+exaone3.5:7.8b                                         c7c4e3d1ca22    4.8 GB    15 hours ago    
+gemma4:e2b                                             7fbdbf8f5e45    7.2 GB    16 hours ago    
+qwen3.5:4b                                             2a654d98e6fb    3.4 GB    17 hours ago    
+gemma4:e4b                                             c6eb396dbd59    9.6 GB    17 hours ago    
+qwen3.5:9b                                             6488c96fa5fa    6.6 GB    18 hours ago    
+gemma3:4b                                              a2af6cc3eb7f    3.3 GB    7 days ago      
+qwen3:4b-instruct-2507-q4_K_M                          0edcdef34593    2.5 GB    8 days ago
+```
+
+## 실행 조건
+
+Python 경로(README 4절)와 같은 입력을 사용했습니다. CLI는 system/user 역할 분리가
+없으므로 고정 지시문과 질문을 하나의 프롬프트로 이어 붙였습니다. 따라서 **Python 경로의
+측정값과 직접 비교하지 않습니다.** 이 기록의 목적은 CLI 실행 가능 여부 확인입니다.
+
+| 항목 | 값 |
+|---|---|
+| 입력 | `data/system_prompt.txt` + `data/policy.md` + Q1 |
+| thinking | `--think=false` (README 4절 고정 설정과 동일) |
+| context / temperature | `ollama run` 기본값 — Python 경로의 `num_ctx=4096`, `temperature=0.2`와 다름 |
+
+질문(Q1): 출발 25일 전에 취소하면 수수료가 얼마인가요?  
+기대 결과: 출발 29일 전~20일 전 구간에 해당해 요금의 10%인 89,000원.
+
+## 로컬 A — `qwen3.5:9b`
+
+```
+$ ollama run qwen3.5:9b --think=false "<고정 지시문 + 정책 문서 + Q1>"
+
+제공된 자료에 따르면 출발 29 일 전부터 20 일 전까지 취소 시 요금의 10% 가 부
+과됩니다.
+따라서 출발 25 일 전인 경우 요금 총액의 10% 가 취소 수수료로 적용되겠습니다
+.
+더 자세한 상담이 필요하시다면 담당 상담원과 직접 연결해 드리겠습니다.
+
+```
+
+소요 6.0초 (모델 로딩 포함, `time` 기준의 벽시계 시간).
+
+```
+$ ollama ps
+NAME          ID              SIZE      PROCESSOR    CONTEXT    UNTIL              
+qwen3.5:9b    6488c96fa5fa    5.5 GB    100% GPU     4096       4 minutes from now
+```
+
+## 로컬 B — `gemma4:e4b`
+
+```
+$ ollama run gemma4:e4b --think=false "<고정 지시문 + 정책 문서 + Q1>"
+
+고객님께서 출발 25일 전에 취소하실 경우, '출발 29일 전 ~ 20일 전' 기준이 적
+용되어 **요금의 10%**의 수수료가 부과됩니다. 이 수수료는 '요금 총액을 기준으
+로 계산하며, 인원별로 각각 적용'된다고 안내되어 있습니다.
+
+```
+
+소요 6.6초 (모델 로딩 포함, `time` 기준의 벽시계 시간).
+
+```
+$ ollama ps
+NAME          ID              SIZE      PROCESSOR    CONTEXT    UNTIL              
+gemma4:e4b    c6eb396dbd59    3.2 GB    100% GPU     4096       4 minutes from now
+```
+
+두 후보 모두 CLI에서 정상 실행되고 한국어 응답을 반환했습니다.
+품질 채점은 CLI 기록이 아니라 Python 경로의 본 실험 결과로 수행합니다.
