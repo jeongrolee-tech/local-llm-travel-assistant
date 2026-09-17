@@ -515,6 +515,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 |---|---|
 | [docs/02_model_comparison.md](docs/02_model_comparison.md) | **Model Comparison Table (산출물 2번)** |
 | [docs/cli/cli_session.txt](docs/cli/cli_session.txt) | CLI(`ollama run`) 실행 기록 |
+| [docs/walkthrough.md](docs/walkthrough.md) | 수동 실행 워크스루 (발제문 STEP 4) |
 | [docs/pilot/](docs/pilot/) | 후보 선별 예비 실행 원본 기록 (본 실험 아님) |
 | [docs/03_benchmark.md](docs/03_benchmark.md) | 실험 결과와 품질 평가 |
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
