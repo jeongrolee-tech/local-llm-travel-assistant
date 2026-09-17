@@ -680,6 +680,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | [docs/03_benchmark.md](docs/03_benchmark.md) | 실험 결과와 품질 평가 |
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
 | [docs/05_selection_report.md](docs/05_selection_report.md) | 최종 선정 보고서 |
+| [docs/presentation.md](docs/presentation.md) | 발표 자료 (슬라이드 6장 + 질문 대비) |
 
 ---
 
