@@ -404,13 +404,78 @@ messages=[{"role": "system", "content": sysp},     # system_prompt.txt + policy.
 
 ## STEP 7. 레코드 저장
 
+실행 스크립트: [`examples/05_record.py`](../examples/05_record.py)
 저장 경로: `results/practice/sample.jsonl`
 
-```json
-(저장된 레코드 1건 붙여넣기)
+```
+$ ollama stop qwen3.5:9b
+$ uv run python examples/05_record.py
+저장 완료 → results\practice\sample.jsonl
+
+  qid              Q1
+  run              1
+  warmup           False
+  model            qwen3.5:9b
+  digest           6488c96fa5fa
+  quantization     Q4_K_M
+  context_length   4096
+  options          {'temperature': 0.2, 'num_ctx': 4096}
+  think            False
+  num_predict      None
+  processor        100% GPU
+  elapsed_s        5.417
+  load_s           3.874
+  prompt_tok       979
+  out_tok          60
+  gen_tok_per_s    58.84
+  gen_speed_note   None
+  vram_mib         5236
+  status           success
+  done_reason      stop
+  answer           제공된 자료에 따르면 출발 29일 전부터 20일 전까지 취소할 경우 ...
+
+채워지지 않은 필수 필드: 없음
 ```
 
-**확인 결과:** `{None 으로 남은 필드가 있었는가}`
+### 되읽기 검증
+
+저장한 JSONL 을 다시 파싱해 발제문 요구 항목이 모두 들어 있는지 대조했습니다.
+레코드 21개 필드, 한글 보존 정상.
+
+| 발제문 요구 | 필드 | |
+|---|---|---|
+| 질문·실행 ID | `qid` | OK |
+| 반복 회차 | `run` | OK |
+| 워밍업 여부 | `warmup` | OK |
+| 모델 태그 | `model` | OK |
+| digest | `digest` | OK |
+| quantization_level | `quantization` | OK |
+| 실제 context_length | `context_length` | OK |
+| 생성 설정 | `options`, `think` | OK |
+| 출력 한도 | `num_predict` | OK (미설정 = `None`) |
+| CPU/GPU 적재 상태 | `processor` | OK |
+| 전체 응답 시간 | `elapsed_s` | OK |
+| 로딩 시간 | `load_s` | OK |
+| 출력 토큰 수 | `out_tok` | OK |
+| 생성 속도 | `gen_tok_per_s` | OK |
+| VRAM | `vram_mib` | OK |
+| 성공·오류 상태 | `status`, `done_reason` | OK |
+| 원본 응답 | `answer` | OK |
+
+**확인 결과: 채워지지 않은 필수 필드 없음.**
+
+`None` 으로 남은 두 필드는 의도된 것입니다.
+
+| 필드 | `None` 인 이유 |
+|---|---|
+| `num_predict` | 본 실험은 출력 한도를 설정하지 않습니다(모델 기본값). **설정하지 않았다는 사실 자체가 기록**이므로 필드를 지우지 않습니다. |
+| `gen_speed_note` | `eval_duration > 0` 이라 생성 속도를 정상 계산했습니다. 계산 불가일 때만 사유가 들어갑니다. |
+
+**측정 불가 값을 `0` 으로 채우지 않는 구조입니다.** 발제문 주의사항이 요구하는 바이며,
+`gen_tok_per_s` 가 `None` 이면 `gen_speed_note` 에 사유가 남습니다. 집계 시 `None` 은
+평균 계산에서 제외하고 `n` 에도 넣지 않습니다.
+
+**이 레코드 구조가 그대로 `src/run_local.py` 의 출력 형식이 됩니다.**
 
 ---
 
