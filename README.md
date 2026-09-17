@@ -395,7 +395,24 @@ uv run python src/run_cloud.py
 uv run python src/aggregate.py
 ```
 
-API 키는 `.env`로 관리하며 저장소에 포함하지 않습니다. `.env.example`을 복사해 사용하십시오.
+### API 키 취급
+
+**키는 파일에 저장하지 않습니다.** `src/run_cloud.py` 실행 시 터미널에 입력받으며, 화면에 표시되지 않고 프로세스가 끝나면 사라집니다.
+
+```
+$ uv run python src/run_cloud.py
+...
+OpenAI API 키를 붙여넣고 Enter (화면에 보이지 않음):
+```
+
+| 항목 | 처리 |
+|---|---|
+| 입력 방식 | `getpass` — 터미널 입력, 화면 미표시 |
+| 저장 | **하지 않음.** `.env`·환경변수·설정 파일 모두 사용하지 않음 |
+| 결과 파일 | 키가 들어가지 않음. 오류 메시지도 키를 포함하지 않음 |
+| 저장소 | 키 관련 파일 자체가 없음 |
+
+발제문 주의사항 *"API 키를 코드 파일, 저장소, 실험 로그, 스크린샷에 포함하지 않습니다"* 에 대응합니다.
 
 ---
 
@@ -651,6 +668,6 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 ## 12. 저장소에 포함하지 않는 것
 
 - 모델 가중치 파일
-- API 키 및 `.env`
+- API 키 (실행 시 터미널 입력, 파일로 저장하지 않음)
 - 가상환경 디렉터리 전체
 - 실제 고객 데이터 (본 실험은 가상 문서만 사용)
