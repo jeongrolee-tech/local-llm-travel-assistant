@@ -2,8 +2,8 @@ from time import perf_counter
 
 from ollama import Client
 
-MODEL = "qwen3:4b-instruct-2507-q4_K_M"
-QUESTION = "프롬프트 엔지니어링이 무엇인지 초보자에게 두 문장으로 설명해 주세요."
+MODEL = "qwen3.5:9b"
+QUESTION = "출발 25일 전에 취소하면 수수료가 얼마인가요?"
 client = Client(host="http://127.0.0.1:11434", timeout=180)
 
 print("Ollama의 답변을 끝까지 받는 데 걸린 시간을 측정합니다.")
@@ -12,7 +12,11 @@ response = client.chat(
     model=MODEL,
     messages=[{"role": "user", "content": QUESTION}],
     stream=False,
-    options={"temperature": 0, "num_predict": 256},
+    think=False,
+    # temperature 를 0 으로 두지 않는 이유는 01_ollama_chat.py 주석과
+    # README 4절 참조. 요약: rubric.md 의 P4 판정이 "4회 중 3회 이상" 이라
+    # 회차마다 답이 달라져야 성립하는데, temperature=0 이면 반복이 전부 같습니다.
+    options={"temperature": 0.2, "num_ctx": 4096},   # 본 실험 고정값
 )
 elapsed = perf_counter() - start
 
