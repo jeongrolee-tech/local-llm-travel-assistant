@@ -36,11 +36,11 @@
 
 | 구분 | 모델 | 실행 태그 | digest | Quantization | License |
 |---|---|---|---|---|---|
-| 로컬 A | `{}` | `{}` | `{}` | `{}` | `{}` |
-| 로컬 B | `{}` | `{}` | `{}` | `{}` | `{}` |
+| 로컬 A | Qwen3.5 9B | `qwen3.5:9b` | `6488c96fa5fa` | Q4_K_M | Apache 2.0 |
+| 로컬 B | Gemma 4 E4B | `gemma4:e4b` | `c6eb396dbd59` | Q4_K_M | Apache 2.0 (+ Prohibited Use Policy) |
 | Cloud | gpt-4o-mini | `gpt-4o-mini` | — | — | OpenAI API 이용약관 |
 
-전체 비교표는 [docs/02_model_comparison.md](docs/02_model_comparison.md)에 있습니다.
+전체 비교표는 [docs/02_model_comparison.md](docs/02_model_comparison.md)에 있습니다. 두 후보는 **2-8의 후보 선별 예비 실행**을 근거로 선정했습니다. 선정 축은 *실패 방식이 서로 다른 두 모델* 입니다 — 로컬 A는 금액을 계산하지만 문서에 있는 내용을 과잉 회피하고, 로컬 B는 문서 이해·지시 준수가 안정적이지만 금액 계산을 회피합니다.
 
 ### 2-1. 로컬 후보 모델 카드
 
@@ -260,15 +260,18 @@ qwen3.5 계열은 **thinking이 기본 활성**입니다. 기본값으로 `num_c
 | 패키지 관리 | uv |
 | Ollama | 0.34.0 |
 | GPU / VRAM | NVIDIA GeForce RTX 5060 Laptop GPU / 8,151 MiB |
-| 시스템 RAM | `{}` |
+| 시스템 RAM | 31.4 GB |
 
 생성 설정은 모든 모델·모든 회차에 동일하게 적용했습니다.
 
+`think=False`는 임의 선택이 아닙니다. Qwen3.5 계열은 thinking이 기본 활성이라 `num_ctx=4096`에서 기본값으로 실행하면 thinking이 컨텍스트를 모두 소진해 **빈 응답을 반환합니다**(2-8 참조). 두 모델의 비교 조건을 맞추기 위해 전 모델에 동일하게 비활성화했습니다.
+
 | 설정 | 값 |
 |---|---|
-| temperature | `{}` |
-| 출력 한도 | `{}` |
-| context_length | `{}` |
+| temperature | 0.2 |
+| 출력 한도 | 미설정 (`num_predict` 기본값) |
+| context_length | 4096 (`num_ctx`) |
+| thinking | **비활성 (`think=False`)** — 전 모델 동일 |
 | 대화 이력 | 매 호출 초기화 (단발 질의) |
 
 ---
@@ -280,14 +283,15 @@ qwen3.5 계열은 **thinking이 기본 활성**입니다. 기본값으로 `num_c
 uv sync
 
 # 2. Ollama 모델 준비
-ollama pull {모델A 태그}
-ollama pull {모델B 태그}
+ollama pull qwen3.5:9b      # 로컬 A
+ollama pull gemma4:e4b      # 로컬 B
 
 # 3. 로컬 실험 (워밍업 1회 후 본 실험 20회)
-uv run python src/run_local.py --model {모델A 태그}
-uv run python src/run_local.py --model {모델B 태그}
+#    num_ctx=4096 / temperature=0.2 / think=False 고정
+uv run python src/run_local.py --model qwen3.5:9b
+uv run python src/run_local.py --model gemma4:e4b
 
-# 4. Cloud 실험
+# 4. Cloud 실험 (gpt-4o-mini, 공통 질문 5개 × 1회)
 uv run python src/run_cloud.py
 
 # 5. 집계
@@ -317,9 +321,9 @@ API 키는 `.env`로 관리하며 저장소에 포함하지 않습니다. `.env.
 
 | 모델 | 종합 점수 (100점 환산) | n | 성공/시도 | 평균 응답 시간 | 생성 속도 | VRAM | 필수 조건 |
 |---|---|---|---|---|---|---|---|
-| 로컬 A | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{P1~P4 판정}` |
-| 로컬 B | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |
-| Cloud | `{}` | `{}` | `{}` | `{}` | — | — | 비교 기준 |
+| 로컬 A `qwen3.5:9b` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{P1~P4 판정}` |
+| 로컬 B `gemma4:e4b` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |
+| Cloud `gpt-4o-mini` | `{}` | `{}` | `{}` | `{}` | — | — | 비교 기준 |
 
 Cloud는 질문 5개 × 1회, 로컬은 10개 × 2회로 **반복 수가 다릅니다.** 직접 순위 비교의 근거로 사용하지 않았습니다.
 
@@ -331,6 +335,9 @@ Cloud는 질문 5개 × 1회, 로컬은 10개 × 2회로 **반복 수가 다릅�
 - 단일 노트북 1대에서 측정한 값이므로 다른 장비의 절대 속도와 합산하지 않았습니다.
 - `size_vram`은 측정 시점의 값이며 최대 VRAM 사용량이 아닙니다.
 - `ollama ps`의 PROCESSOR는 CPU/GPU 적재 상태이며 GPU 이용률이 아닙니다.
+- 후보 선별 예비 실행(2-8)은 모델당 1회이므로 P4 정식 판정(Q9·Q10 4회 기준)이 아닙니다. 선별 근거로만 사용했습니다.
+- Cloud 비교 질문 5개를 로컬 예비 실행 결과를 본 뒤에 선정했습니다. 결과와 무관한 사전 규칙을 먼저 정하고 기계적으로 도출했으나, "결과를 보기 전 선정"이라는 원래 절차는 지키지 못했습니다. 선정 규칙과 사유는 [data/questions.json](data/questions.json)의 `cloud_subset`에 기록했습니다.
+- 로컬 B(`gemma4:e4b`)는 thinking을 비활성화한 상태로만 측정했습니다. thinking 활성 시의 품질은 본 실험 범위 밖입니다.
 
 ---
 
@@ -338,6 +345,7 @@ Cloud는 질문 5개 × 1회, 로컬은 10개 × 2회로 **반복 수가 다릅�
 
 | 문서 | 내용 |
 |---|---|
+| [docs/pilot/](docs/pilot/) | 후보 선별 예비 실행 원본 기록 (본 실험 아님) |
 | [docs/02_model_comparison.md](docs/02_model_comparison.md) | Model Comparison Table |
 | [docs/03_benchmark.md](docs/03_benchmark.md) | 실험 결과와 품질 평가 |
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
