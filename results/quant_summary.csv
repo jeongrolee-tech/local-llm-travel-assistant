@@ -1,0 +1,3 @@
+﻿model,quantization,n,score_100,vram_mib,processor,gen_tok_per_s,elapsed_s_mean,out_tok_mean,prompt_tok,success,item1,item2,item3,item4,item5,type_boundary,type_insufficient_info,type_normal,type_out_of_scope
+gemma4:e4b,Q4_K_M,20,86.25,3077,100% GPU,81.8,0.896,67.7,1074,20/20,1.9,1.35,1.65,2,2,87.5,100.0,81.2,100.0
+gemma4:e4b-it-q8_0,Q8_0,20,89.5,5011,100% GPU,58.3,1.171,64.0,1074,20/20,1.95,1.45,1.8,1.95,2,78.1,95.0,90.6,100.0
