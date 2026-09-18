@@ -335,13 +335,15 @@ qwen3.5 계열은 **thinking이 기본 활성**입니다. 기본값으로 `num_c
 | 항목 | 값 |
 |---|---|
 | OS | Windows 11 Pro 10.0.26200 |
-| Python | 3.12.13 |
-| 패키지 관리 | uv (`uv.lock` 고정) |
+| Python | 3.12.13 (필수 실험) → **3.12.10** (선택 실습 A 이후) — 아래 참조 |
+| 패키지 관리 | uv (`uv.lock` 고정, 변경 없음) |
 | `ollama` (Python 패키지) | 0.6.2 |
 | `openai` (Python 패키지) | 3.8.0 |
 | Ollama (서버) | 0.34.0 |
 | GPU / VRAM | NVIDIA GeForce RTX 5060 Laptop GPU / 8,151 MiB |
 | 시스템 RAM | 31.4 GB |
+
+**Python 버전이 실험 도중 바뀐 경위를 기록합니다.** 필수 실험 40회와 Cloud 5회는 uv가 관리하는 CPython 3.12.13에서 수행했습니다. 이후 Windows **Smart App Control**이 시행 모드로 적용되면서 해당 빌드가 서명 미달로 차단되어(9절 #16) 실행이 불가능해졌습니다. PSF 서명본인 CPython **3.12.10**을 설치해 가상환경을 재생성했으며, `requires-python`(`>=3.12,<3.13`)과 `uv.lock`은 변경하지 않았습니다. 선택 실습 A에서 같은 태그·같은 설정을 재실행해 **VRAM·입력 토큰 수가 완전히 일치하고 생성 속도가 +1.7% 차이**임을 확인했습니다([06_quantization](docs/06_quantization.md) 7절).
 
 생성 설정은 모든 모델·모든 회차에 동일하게 적용했습니다.
 
@@ -395,6 +397,14 @@ uv run python src/run_cloud.py
 uv run python src/aggregate.py
 ```
 
+**선택 실습 A (Quantization 비교)** — 필수 과제가 아니며, 위 결과에 영향을 주지 않습니다.
+
+```bash
+ollama pull gemma4:e4b-it-q8_0        # 11 GB. gemma4:e4b 와 같은 모델의 8bit 본
+uv run python src/run_quant.py        # 2버전 × 10문항 × 2회 = 40회
+uv run python src/aggregate_quant.py
+```
+
 ### API 키 취급
 
 **키는 파일에 저장하지 않습니다.** `src/run_cloud.py` 실행 시 터미널에 입력받으며, 화면에 표시되지 않고 프로세스가 끝나면 사라집니다.
@@ -426,6 +436,15 @@ OpenAI API 키를 붙여넣고 Enter (화면에 보이지 않음):
 | `results/scores.csv` | 회차별 채점 결과와 점수 근거 |
 | `results/summary.csv` | 모델별 집계 (평균, n, 성공 수/전체 시도 수) |
 | `results/errors.jsonl` | 호출 실패·측정 불가 기록과 사유 |
+
+**선택 실습 A (Quantization 비교)** — 필수 실험 파일과 분리했습니다.
+
+| 파일 | 내용 |
+|---|---|
+| `results/quant_raw.jsonl` | 양자화 비교 40회 원본 응답과 측정값 |
+| `results/quant_warmup.jsonl` | 워밍업 2회 (집계 제외) |
+| `results/quant_scores.csv` | 회차별 채점 결과와 점수 근거 |
+| `results/quant_summary.csv` | 양자화별 집계 |
 
 각 회차 레코드에는 질문 ID, 반복 회차, 모델 태그, digest, quantization_level, context_length, 응답 시간, 로딩 시간, 출력 토큰 수, 생성 속도, VRAM, 성공·오류 상태를 기록합니다.
 
@@ -497,7 +516,7 @@ Cloud는 공통 질문 5개 × 1회, 로컬은 10개 × 2회로 **반복 수가 
 
 회차별 점수와 점수 근거는 [results/scores.csv](results/scores.csv)에, 문항별 분석과 대표 실패 사례는 [docs/03_benchmark.md](docs/03_benchmark.md)에 있습니다.
 
-워밍업은 모델당 1회로 [results/local_warmup.jsonl](results/local_warmup.jsonl)에 분리 저장했으며 위 집계에 포함하지 않았습니다. 호출 실패 0건이라 `results/errors.jsonl`은 생성되지 않았습니다.
+워밍업은 모델당 1회로 [results/local_warmup.jsonl](results/local_warmup.jsonl)에 분리 저장했으며 위 집계에 포함하지 않았습니다. **로컬 본 실험 40회는 호출 실패 0건입니다.** [results/errors.jsonl](results/errors.jsonl)에 기록된 15건은 전부 Cloud 실험의 인증 실패(`gpt-4o-mini` / `AuthenticationError`)이며, 로컬 결과와 무관합니다(9절 #15).
 
 **측정 조건 확인** — 두 모델 모두 `digest`·`quantization(Q4_K_M)`·`context_length(4096)`·생성 설정이 전 회차 동일하고, 40회 전부 **100% GPU 적재**에 `done_reason=stop`입니다. 생성 속도 계산 불가 회차는 0건입니다.
 
@@ -507,7 +526,28 @@ Cloud는 공통 질문 5개 × 1회, 로컬은 10개 × 2회로 **반복 수가 
 
 **평균 응답 시간과 생성 속도는 로컬 B가 앞섭니다.** 다만 이 값만으로 순위를 정하지 않습니다. 선호 우선순위는 종합 품질 점수 → 한국어 표현 점수 → 응답 시간 → VRAM 순이며, 품질 채점 결과가 나온 뒤 적용합니다.
 
+### 선택 실습 A — Quantization 비교 (필수 항목 아님)
 
+선정 모델 `gemma4:e4b`(Q4_K_M)와 **같은 모델의 8bit 본** `gemma4:e4b-it-q8_0`를 동일 조건으로 40회 비교했습니다. `ollama show`로 architecture·parameters·context length·embedding length가 모두 같고 **양자화만 다름**을 먼저 확인했습니다.
+
+| 축 | Q4_K_M (4bit) | Q8_0 (8bit) | 차이 | 신뢰도 |
+|---|---|---|---|---|
+| VRAM | **3,077 MiB** | 5,011 MiB | **1.63배** | **높음** — 재실행 시 완전 일치 |
+| 적재 상태 | 100% GPU | 100% GPU | 동일 | — |
+| 생성 속도 | **81.8 tok/s** | 58.3 tok/s | **−28.7%** | **높음** — 두 분포가 겹치지 않음 |
+| 품질 종합 (n=20) | 86.25 | **89.50** | +3.25 | **낮음** — 아래 참조 |
+| P4 판정 | 통과 (4/4) | 통과 (4/4) | 동일 | — |
+
+**품질 차이는 판정하지 않았습니다.** Q4_K_M을 같은 설정으로 재실행했을 때 점수가 92.9 → 86.25로 **6.65점** 움직였습니다. 관측된 양자화 효과 3.25점이 측정 변동폭보다 작으므로, "8bit가 낫다"고 말할 근거가 되지 못합니다.
+
+| 확인된 사실 | 내용 |
+|---|---|
+| 8bit가 개선한 것 | Q2·Q3의 **금액 계산 회피** — 534,000원·712,000원을 끝까지 계산 |
+| 8bit가 잃은 것 | Q7의 개인 사정 구분 누락, Q8의 인접 규정 혼동 |
+| 유형별 상쇄 | normal **+9.4** / boundary **−9.4** 로 정확히 상쇄 |
+| 예상 밖 관측 | 디스크 11 GB인 Q8_0이 8 GB VRAM에 **100% 적재** (Per-Layer Embeddings) |
+
+**결론 — 4bit 유지.** 품질 이득은 증명되지 않았고 VRAM +63%·속도 −29%의 비용은 확실합니다. 최종 선정 결과를 바꾸지 않습니다. 상세는 [docs/06_quantization.md](docs/06_quantization.md)에 있습니다.
 
 ---
 
@@ -616,8 +656,20 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | 13 | 채점 | **중복 감점 오류** — 회피를 항목1·2 양쪽에서 감점 | **채점** | 규칙 수립 후 6회차 수정. **선정 근거가 1순위→2순위로 이동** | [03_benchmark](docs/03_benchmark.md) 3절 |
 | 14 | 채점 | **Q4 가 모델 변별에 기여하지 못함** | 평가 설계 | 한계로 기록, 점수는 그대로 반영 | 아래 한계, [03_benchmark](docs/03_benchmark.md) 5절 |
 | 15 | Cloud 실험 | 인증 실패 15건의 401 응답에 **키 마지막 4자가 포함되어 기록** | **코드** | `redact()` 추가 후 기존 기록 마스킹. 미푸시 커밋을 수정해 저장소에서 제거 | [run_cloud.py](src/run_cloud.py) |
+| 16 | 선택 실습 A | Windows **Smart App Control**이 uv의 CPython 3.12.13을 서명 미달로 차단 (`unicodedata.pyd`) | 환경 | PSF 서명본 3.12.10 설치 후 가상환경 재생성. `uv.lock` 변경 없음 | 4절, [06_quantization](docs/06_quantization.md) 10절 |
+| 17 | 선택 실습 A | **같은 모델·같은 설정 재실행에서 품질 점수가 6.65점 이동** (92.9 → 86.25) | **측정** | 측정 변동폭이 양자화 효과(3.25점)보다 큼을 확인. 품질 결론을 "판정 불가"로 제한 | [06_quantization](docs/06_quantization.md) 7절 |
+| 18 | 선택 실습 A | 디스크 11 GB인 Q8_0이 8 GB VRAM에 **100% 적재** | 환경 | Per-Layer Embeddings 때문. 디스크 크기로 VRAM을 추정하지 않도록 기록 | [06_quantization](docs/06_quantization.md) 4절 |
 
 3·9·13번은 **실패 원인을 잘못 짚었다가 재검증으로 바로잡은 사례**입니다. 특히 13번은 결론(선정 모델)은 같았지만 **근거가 바뀌었습니다.**
+
+17번은 **필수 실험의 점수 해상도 한계를 사후에 실측으로 확인한 사례**입니다. 다만 **선정 근거는 흔들리지 않습니다.** 최종 선정은 1순위(종합 점수)가 아니라 2순위(한국어 표현)로 갈렸는데(7절 선정 판정 경로), 그 항목은 재실행에서 안정적이었습니다.
+
+| 지표 | 선정에 쓰인 값 | 재실행값 | 변동 |
+|---|---|---|---|
+| 종합 점수 (1순위, **선정 근거 아님**) | 92.9 | 86.25 | **6.65** |
+| 한국어 표현 항목 (2순위, **실제 선정 근거**) | 1.95 | 2.00 | **0.05** |
+
+종합 점수의 4.8점 차이는 애초에 루브릭의 5점 동점 기준에 걸려 판정에 쓰이지 않았고, 실제 판정에 쓰인 한국어 표현 항목의 0.30점 차이(1.95 vs 1.65)는 재실행 변동폭 0.05점보다 6배 큽니다. 10절 한계에 반영했습니다.
 
 ---
 
@@ -631,6 +683,9 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | 문항별 n=2 | 문항 단위 비교의 신뢰구간이 넓음 | 문항별 점수는 **참고값**으로만 제시 (7절) |
 | 후보 선별 예비 실행은 모델당 1회 | P4 정식 판정(Q9·Q10 **4회** 기준)이 아님 | 선별 근거로만 사용, 본 실험에서 재판정 (2-8) |
 | 예비 실행이 `temperature=0.2` × 1회 | 응답 차이에 샘플링 변동이 섞임 | 실제로 설정 효과로 오독한 사례 발생 → 재검증(2-8). 본 실험은 **2회 반복** |
+| **n=20 의 점수 변동폭이 6.65점으로 실측됨** | 종합 점수에서 **5점 안팎의 차이는 분해되지 않음** | 선택 실습 A에서 같은 모델·같은 설정을 재실행해 확인(9절 #17). 선정은 변동폭 0.05점인 2순위 항목으로 갈렸으므로 결론은 유지 |
+
+이 마지막 항목은 **필수 실험을 마친 뒤 선택 실습에서 사후에 확인한 값**입니다. 실험 설계 시점에는 변동폭을 알지 못했고, 루브릭의 5점 동점 기준은 측정이 아니라 사전 판단으로 정한 값이었습니다. **결과적으로 그 기준이 실측 변동폭과 비슷한 크기여서 타당했습니다.**
 
 ### 채점
 
@@ -681,6 +736,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | [docs/04_local_vs_cloud.md](docs/04_local_vs_cloud.md) | Local LLM vs Cloud API 비교 |
 | [docs/05_selection_report.md](docs/05_selection_report.md) | 최종 선정 보고서 |
 | [docs/presentation.md](docs/presentation.md) | 발표 자료 (슬라이드 6장 + 질문 대비) |
+| [docs/06_quantization.md](docs/06_quantization.md) | **선택 실습 A — Quantization 비교** (필수 항목 아님) |
 
 ---
 
