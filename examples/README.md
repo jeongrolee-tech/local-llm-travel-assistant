@@ -44,3 +44,37 @@ uv run python 03_measure_time.py
 이 값은 첫 토큰 시간(TTFT)이 아닙니다. 모델을 처음 불러오는 시간과 PC 상태, 답변 길이에 영향을 받으므로 한 번의 숫자만으로 모델 우열을 정하지 않습니다.
 
 실행 파일 안의 `QUESTION` 한 줄을 바꾸고 **Ctrl+S**로 저장하면 다른 질문을 보낼 수 있습니다. 이 파일들은 대화 기록을 유지하지 않고, 매번 질문 1개를 새로 보냅니다.
+
+---
+
+## 이 프로젝트에서 추가한 예제
+
+위 01~03은 강의에서 제공된 원본입니다. 아래는 본 프로젝트를 진행하며 추가한 것으로,
+각 단계에서 무엇을 확인했는지는 [docs/walkthrough_log.md](../docs/walkthrough_log.md)와
+[docs/07_embedding.md](../docs/07_embedding.md)에 기록했습니다.
+
+### 본 실험 준비 (발제문 STEP 4 수동 실행)
+
+| 파일 | 확인한 것 |
+|---|---|
+| `04_metrics.py` | 응답에서 토큰 수·로딩 시간·생성 속도를 꺼내는 방법 |
+| `05_record.py` | 회차 1건을 JSONL로 남기는 형식 |
+| `06_errors.py` | 호출 실패를 0점이 아니라 별도로 기록하는 방법 |
+| `07_check_key.py` | API 키 유효성만 확인 (답변을 생성하지 않아 과금 없음) |
+
+### 선택 실습 B — Embedding
+
+`uv add sentence-transformers`가 필요합니다. 최초 실행 시 임베딩 모델 약 442 MB를 받습니다.
+전 단계가 같은 모델(`jhgan/ko-sroberta-multitask`)과 같은 설정을 씁니다.
+
+| 파일 | 확인한 것 |
+|---|---|
+| `08_embedding.py` | 문장 길이와 무관하게 벡터는 항상 768차원 |
+| `09_cosine.py` | 코사인 유사도를 공식대로 손계산해 라이브러리 값과 대조 |
+| `10_similarity.py` | 발제문 지정 3문장 비교 + 어휘 겹침과의 차이 |
+| `11_token_vs_embedding.py` | **토큰 ID와 임베딩의 구분** (발제문 요구) |
+| `12_similarity_is_not_truth.py` | 유사도가 사실 여부를 구분하지 못함을 실측 |
+| `13_retrieval_diagnosis.py` | 12번의 검색이 실패한 원인 진단 |
+
+12번 2부의 검색 결과는 **예상과 달리 실패했습니다**(3문항 중 1개 적중). 스크립트를 고치지 않고
+13번으로 원인을 진단해 함께 남겼습니다. 상세는 [docs/07_embedding.md](../docs/07_embedding.md) 8절에 있습니다.

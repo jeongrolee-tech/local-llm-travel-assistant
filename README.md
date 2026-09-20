@@ -432,6 +432,18 @@ uv run python src/run_quant.py        # 2버전 × 10문항 × 2회 = 40회
 uv run python src/aggregate_quant.py
 ```
 
+**선택 실습 B (Embedding 비교)** — 필수 과제가 아닙니다.
+
+```bash
+uv add sentence-transformers                            # 최초 1회, 임베딩 모델 442 MB
+uv run python examples/08_embedding.py                  # 문장 → 벡터
+uv run python examples/09_cosine.py                     # 코사인 유사도 손계산
+uv run python examples/10_similarity.py                 # Semantic Similarity
+uv run python examples/11_token_vs_embedding.py         # 토큰 ID vs 임베딩
+uv run python examples/12_similarity_is_not_truth.py    # 유사도 ≠ 사실성
+uv run python examples/13_retrieval_diagnosis.py        # 검색 실패 원인 진단
+```
+
 **보조 도구** — 실험에 영향을 주지 않으며, 문서의 수치를 검증할 때 씁니다.
 
 ```bash
@@ -730,7 +742,9 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 
 #### 미채택 사유
 
-발제문이 **"Vector DB와 RAG 시스템 구현은 요구하지 않습니다"**로 범위를 정했고, 현재 문서 규모에서 실익도 없습니다. 검색의 원리는 **선택 실습 B(Embedding 실험)**에서 별도로 확인합니다 — 임베딩과 코사인 유사도가 RAG의 **R**에 해당하는 부분입니다.
+발제문이 **"Vector DB와 RAG 시스템 구현은 요구하지 않습니다"**로 범위를 정했고, 현재 문서 규모에서 실익도 없습니다. 검색의 원리는 [선택 실습 B](docs/07_embedding.md)에서 별도로 확인했습니다 — 임베딩과 코사인 유사도가 RAG의 **R**에 해당하는 부분입니다.
+
+**그 실습에서 검색이 3문항 중 1개만 맞혔습니다.** `policy.md`를 절 단위로 쪼개 질문과 매칭했을 때 Q5·Q6의 답이 서로 뒤바뀌었습니다. RAG로 전환하더라도 **임베딩만 붙이면 되는 것이 아니라 청킹·문턱값·top-k 설계가 따로 필요하다**는 뜻이며, 이는 위 전환 문턱을 판단할 때 함께 고려해야 합니다. 상세는 [07_embedding](docs/07_embedding.md) 8절에 있습니다.
 
 **보고서·발표에서 이 프로젝트를 "RAG를 구현했다"고 기술하지 않습니다.** 정확한 기술은 다음과 같습니다.
 
@@ -764,8 +778,12 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | 17 | 선택 실습 A | **같은 모델·같은 설정 재실행에서 품질 점수가 6.65점 이동** (92.9 → 86.25) | **측정** | 측정 변동폭이 양자화 효과(3.25점)보다 큼을 확인. 품질 결론을 "판정 불가"로 제한 | [06_quantization](docs/06_quantization.md) 7절 |
 | 18 | 선택 실습 A | 디스크 11 GB인 Q8_0이 8 GB VRAM에 **100% 적재** | 환경 | Per-Layer Embeddings 때문. 디스크 크기로 VRAM을 추정하지 않도록 기록 | [06_quantization](docs/06_quantization.md) 4절 |
 | 19 | 사후 검토 | `temperature=0`이면 **P4 기준이 성립하지 않는다고 서술**했으나 사실이 아님 | **문서** | 정정 — 기준이 "둘 다 통과"로 **엄격해질 뿐** 작동함. 설정 선택의 트레이드오프를 4절·10절에 전면 재서술 | 4절, 10절 |
+| 20 | 선택 실습 B | 임베딩 유사도에서 **거짓 문장이 참 문장보다 높게 측정**됨 (0.7748 vs 0.7635) | 기법 한계 | 유사도를 사실성 판정에 쓰지 않는 근거로 기록. 루브릭 채점의 타당성을 뒷받침 | [07_embedding](docs/07_embedding.md) 7절 |
+| 21 | 선택 실습 B | 절 단위 검색이 **3문항 중 1개만 적중**, Q5·Q6 답이 서로 뒤바뀜 | **측정·기법** | 가설 4개로 진단. H1(128토큰 초과) 사실이나 원인 아님, H2(조각 크기) 기각, H3(핵심어가 틀 단어에 밀림) 확인, H4(모델 용도 불일치) 미검증. **top-2면 3/3** | [07_embedding](docs/07_embedding.md) 8절 |
 
 3·9·13·19번은 **판단이나 서술을 잘못했다가 재검증으로 바로잡은 사례**입니다. 특히 13번은 결론(선정 모델)은 같았지만 **근거가 바뀌었고**, 19번은 실험 설계의 정당화 논리 자체가 부정확했던 경우입니다.
+
+17·21번은 **예상을 먼저 적어두고 측정했더니 그 예상이 틀렸음이 드러난 사례**입니다. 21번의 경우 스크립트에 "유사도가 잘하는 일" 이라는 제목을 미리 달아두었다가 실측에 뒤집혔으며, 수정하지 않고 진단 과정과 함께 남겼습니다.
 
 17번은 **필수 실험의 점수 해상도 한계를 사후에 실측으로 확인한 사례**입니다. 다만 **선정 근거는 흔들리지 않습니다.** 최종 선정은 1순위(종합 점수)가 아니라 2순위(한국어 표현)로 갈렸는데(7절 선정 판정 경로), 그 항목은 재실행에서 안정적이었습니다.
 
@@ -852,6 +870,7 @@ srv load_model: [mtmd] estimated worst-case memory usage of mmproj is  986.67 Mi
 | [docs/05_selection_report.md](docs/05_selection_report.md) | 최종 선정 보고서 |
 | [docs/presentation.md](docs/presentation.md) | 발표 자료 (슬라이드 6장 + 질문 대비) |
 | [docs/06_quantization.md](docs/06_quantization.md) | **선택 실습 A — Quantization 비교** (필수 항목 아님) |
+| [docs/07_embedding.md](docs/07_embedding.md) | **선택 실습 B — Embedding 실험** (필수 항목 아님) |
 
 ---
 
